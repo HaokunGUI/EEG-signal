@@ -43,7 +43,7 @@ if __name__ == '__main__':
     parser.add_argument('--marker_dir', type=str, default='/home/guihaokun/Time-Series-Pretrain/data', help='marker dir')
     parser.add_argument('--data_augment', action='store_true', help='use data augment or not', default=False)
     parser.add_argument('--normalize', action='store_true', help='normalize data or not', default=False)
-    parser.add_argument('--train_batch_size', type=int, default=2, help='batch size of train input data')
+    parser.add_argument('--train_batch_size', type=int, default=128, help='batch size of train input data')
     parser.add_argument('--test_batch_size', type=int, default=256, help='batch size of test input data')
     parser.add_argument('--num_workers', type=int, default=48, help='data loader num workers')
 

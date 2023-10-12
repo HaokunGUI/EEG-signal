@@ -122,7 +122,7 @@ class Exp_SSL(Exp_Basic):
                                   metric_name=self.args.loss_fn,
                                   maximize_metric=False)
 
-            with torch.enable_grad() and tqdm(train_loader, desc=f'Epoch: {epoch + 1} / {self.args.num_epochs}') as progress_bar:
+            with torch.enable_grad() and tqdm(train_loader.dataset, desc=f'Epoch: {epoch + 1} / {self.args.num_epochs}') as progress_bar:
                 for i, (x, y_true, adj_mat, supports) in enumerate(train_loader):
                     model_optim.zero_grad()
 
