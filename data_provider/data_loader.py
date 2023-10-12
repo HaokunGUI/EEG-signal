@@ -26,6 +26,7 @@ class Dataset_TUSZ(Dataset):
         self.time_step_len = args.time_step_len
         self.data_augment = args.data_augment
         self.use_graph = args.use_graph
+        self.preproc_dir = args.preproc_dir
         self.args = args
         self.scalar = scalar
 
@@ -52,7 +53,14 @@ class Dataset_TUSZ(Dataset):
     def __getitem__(self, index: int) -> Any:
         if self.task_name == 'ssl':
             file_name_tuple = self.file_tuples[index]
-            x, y = self._getIdx2Slice(file_name_tuple)
+
+            if self.preproc_dir is None:
+                x, y = self._getIdx2Slice(file_name_tuple)
+            else:
+                file_name = f'datasets_{self.split}_{index}.h5'
+                with h5py.File(os.path.join(self.preproc_dir, file_name), 'r') as hf:
+                    x = hf['x'][()]
+                    y = hf['y'][()]
 
             if self.data_augment:
                 # TODO
@@ -125,6 +133,7 @@ class Dataset_TUSZ(Dataset):
             start_time_step += time_step_num
         time_steps = np.stack(time_steps, axis=0)
         return time_steps[:(self.input_len // self.time_step_len), :, :], time_steps[(self.input_len // self.time_step_len):, :, :]
+    
     
         
         
