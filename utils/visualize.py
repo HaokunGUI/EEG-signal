@@ -5,13 +5,13 @@ import collections
 import matplotlib
 import matplotlib.pyplot as plt
 from scipy.stats import rankdata
+import os
 
-
-def get_spectral_graph_positions():
+def get_spectral_graph_positions(file_dir:str):
     """
     Get positions of EEG electrodes for visualizations
     """
-    file = '../data/electrode_graph/adj_mx_3d.pkl'
+    file = os.path.join(file_dir, 'electrode_graph/adj_mx_3d.pkl')
 
     with open(file, 'rb') as f:
         adj_mx_all = pickle.load(f)
@@ -65,6 +65,7 @@ def draw_graph_weighted_edge(
         fig_size: figure size
 
     """
+    adj_mx = adj_mx[0]
     eeg_viz = nx.DiGraph() if is_directed else nx.Graph()
     node_id_label = collections.defaultdict()
 
@@ -87,7 +88,7 @@ def draw_graph_weighted_edge(
     cmap = plt.cm.Greys(np.linspace(0, 1, (k + 1) * len(weights)))
     cmap = matplotlib.colors.ListedColormap(cmap[len(weights):-1:(k - 1)])
 
-    plt.figure(figsize=fig_size)
+    fig = plt.figure(figsize=fig_size)
     nx.draw_networkx(eeg_viz, pos_spec, labels=node_id_label, with_labels=True,
                      edgelist=edges, edge_color=rankdata(weights),
                      width=fig_size[1] / 2, edge_cmap=cmap, font_weight='bold',
@@ -102,9 +103,11 @@ def draw_graph_weighted_edge(
             cmap=cmap, norm=plt.Normalize(
                 vmin=0, vmax=1))
         sm.set_array([])
-        plt.colorbar(sm)
+        plt.colorbar(sm, cax=plt.axes([0.95, 0.1, 0.03, 0.8]))
     plt.tight_layout()
     if save_dir is not None:
+        save_dir = os.path.join(save_dir, title)
         plt.savefig(save_dir, dpi=300)
 
     plt.show()
+    return fig

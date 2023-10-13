@@ -37,11 +37,7 @@
     "test_batch_size": 256,
     "time_step_len": 1,
     "top_k": 3,
-<<<<<<< HEAD
     "train_batch_size": 128,
-=======
-    "train_batch_size": 64,
->>>>>>> 4940efbb0622e0d06e94b44a447cfdfe610073b4
     "use_curriculum_learning": true,
     "use_fft": true,
     "use_gpu": true,

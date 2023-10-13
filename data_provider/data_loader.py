@@ -130,6 +130,8 @@ class Dataset_TUSZ(Dataset):
                 amp = np.abs(fourier_signal)
                 amp[amp == 0.0] = 1e-8  # avoid log of 0
                 time_steps.append(np.log(amp))
+            else:
+                time_steps.append(slice)
             start_time_step += time_step_num
         time_steps = np.stack(time_steps, axis=0)
         return time_steps[:(self.input_len // self.time_step_len), :, :], time_steps[(self.input_len // self.time_step_len):, :, :]

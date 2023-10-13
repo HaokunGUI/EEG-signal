@@ -75,8 +75,9 @@ class Exp_SSL(Exp_Basic):
             for i, (x, y_true, _, supports) in tqdm(enumerate(vali_loader)):
                 x = x.float().to(self.device)
                 y_true = y_true.float().to(self.device)
-                for i in range(len(supports)):
-                    supports[i] = supports[i].to(self.device)
+                if self.args.use_graph:
+                    for i in range(len(supports)):
+                        supports[i] = supports[i].to(self.device)
 
                 y_pred = self.model(x, y_true, supports, None)
 
@@ -115,6 +116,7 @@ class Exp_SSL(Exp_Basic):
         scheduler = self._select_scheduler(model_optim)
 
         for epoch in range(self.args.num_epochs):
+            start_draw = True
             self.steps = 0
             self.model.train()
 
@@ -129,25 +131,26 @@ class Exp_SSL(Exp_Basic):
                     x = x.float().to(self.device)
                     batch_size = x.size(0)
                     y_true = y_true.to(self.device)
-                    for i in range(len(supports)):
-                        supports[i] = supports[i].to(self.device)
-
                     if self.args.use_graph:
+                        for i in range(len(supports)):
+                            supports[i] = supports[i].to(self.device)
+
+                    if self.args.use_graph and start_draw:
                         if self.args.graph_type == 'distance' and self.args.adj_every > 0:
-                            pos_spec = get_spectral_graph_positions()
-                            draw_graph_weighted_edge(adj_mat, NODE_ID_DICT, pos_spec, title=f'distance_epoch{epoch}.png', 
+                            pos_spec = get_spectral_graph_positions(self.args.marker_dir)
+                            fig = draw_graph_weighted_edge(adj_mat, NODE_ID_DICT, pos_spec, title=f'distance_epoch{epoch}.png', 
                                                      is_directed=False, plot_colorbar=True, font_size=30,
                                                      save_dir=os.path.join(self.args.log_dir, self.args.model, self.args.task_name, 'graph'))
                             self.args.adj_every = 0
-                            self.logging.add_figure('graph/distance', os.path.join(self.args.log_dir, self.args.model, self.args.task_name, 'graph', f'distance_epoch{epoch}.png'), epoch)
-                        elif self.args.graph_type == 'laplacian' and (self.args.adj_every + 1) % self.args.adj_every == 0:
-                            pos_spec = get_spectral_graph_positions()
-                            draw_graph_weighted_edge(adj_mat, NODE_ID_DICT, pos_spec, title=f'laplacian_epoch{epoch}.png', 
+                            self.logging.add_figure('graph/distance', fig, epoch)
+                            start_draw = False
+                        elif self.args.graph_type == 'correlation' and (epoch + 1) % self.args.adj_every == 0:
+                            pos_spec = get_spectral_graph_positions(self.args.marker_dir)
+                            fig = draw_graph_weighted_edge(adj_mat, NODE_ID_DICT, pos_spec, title=f'correlation_epoch{epoch}.png', 
                                                      is_directed=self.args.directed, plot_colorbar=True, font_size=30, 
                                                      save_dir=os.path.join(self.args.log_dir, self.args.model, self.args.task_name, 'graph'))
-                            self.logging.add_figure('graph/laplacian', os.path.join(self.args.log_dir, self.args.model, self.args.task_name, 'graph', f'laplacian_epoch{epoch}.png'), epoch)
-                    else:
-                        supports = None
+                            self.logging.add_figure(f'graph/correlation_{epoch}', fig, epoch)
+                            start_draw = False
 
                     seq_pred = self.model(x, y_true, supports, self.steps)
                     loss = criterion(y_true, seq_pred).to(self.device)
@@ -191,8 +194,9 @@ class Exp_SSL(Exp_Basic):
             for i, (x, y_true, _, supports) in tqdm(enumerate(test_loader)):
                 x = x.float().to(self.device)
                 y_true = y_true.float().to(self.device)
-                for i in range(len(supports)):
-                    supports[i] = supports[i].to(self.device)
+                if self.args.use_graph:
+                    for i in range(len(supports)):
+                        supports[i] = supports[i].to(self.device)
 
                 y_pred = self.model(x, y_true, supports, None)
 
