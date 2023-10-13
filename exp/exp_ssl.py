@@ -144,7 +144,7 @@ class Exp_SSL(Exp_Basic):
                             self.args.adj_every = 0
                             self.logging.add_figure('graph/distance', fig, epoch)
                             start_draw = False
-                        elif self.args.graph_type == 'correlation' and (epoch + 1) % self.args.adj_every == 0:
+                        elif self.args.graph_type == 'correlation' and (epoch % self.args.adj_every == 0):
                             pos_spec = get_spectral_graph_positions(self.args.marker_dir)
                             fig = draw_graph_weighted_edge(adj_mat, NODE_ID_DICT, pos_spec, title=f'correlation_epoch{epoch}.png', 
                                                      is_directed=self.args.directed, plot_colorbar=True, font_size=30, 

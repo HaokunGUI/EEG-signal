@@ -41,7 +41,16 @@ class Dataset_TUSZ(Dataset):
                 self.size = len(self.file_tuples)
 
         elif self.task_name == 'anomaly_detection':
-            pass
+            nosz_file_name = f'{self.split}Set_seq2seq_{self.input_len}s_nosz.txt'
+            sz_file_name = f'{self.split}Set_seq2seq_{self.input_len}s_sz.txt'
+            with open(os.path.join(self.marker_dir, nosz_file_name), 'r') as f_nosz:
+                with open(os.path.join(self.marker_dir, sz_file_name), 'r') as f_sz:
+                    f_nosz_str = f_nosz.readlines()
+                    f_sz_str = f_sz.readlines()
+                    if self.split == 'train':
+                        num_sz = int(self.args.scale_ratio * len(f_))
+
+            file_path = os.path.join(self.marker_dir, file_name)
 
         elif self.task_name == 'classification':
             pass

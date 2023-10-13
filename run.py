@@ -4,6 +4,9 @@ from exp.exp_anomaly_detection import Exp_Anomaly_Detection
 from exp.exp_classification import Exp_Classification
 from exp.exp_ssl import Exp_SSL
 import os
+import torch.multiprocessing
+torch.multiprocessing.set_sharing_strategy('file_system')
+
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '1,2,3'
 
