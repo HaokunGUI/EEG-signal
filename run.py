@@ -38,7 +38,7 @@ if __name__ == '__main__':
                         help='task name, options:[classification, anomaly_detection, ssl]')
     parser.add_argument('--model', type=str, required=True, default='DCRNN',
                         help='model name, options: [DCRNN, TimesNet]')
-    parser.add_argument('--log_dir', type=str, default='./logging', help='log dir')
+    parser.add_argument('--log_dir', type=str, default='/home/guihaokun/Time-Series-Pretrain/logging', help='log dir')
 
     # data loader
     parser.add_argument('--dataset', type=str, default='TUSZ', help='dataset type, options:[TUSZ]')
