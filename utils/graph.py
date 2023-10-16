@@ -11,17 +11,16 @@ def get_supports(args:argparse.Namespace, input: torch.Tensor):
     if len(input.shape) == 4:
         bs, sl, num, lens = input.shape
         input = input.permute(0, 2, 1, 3).reshape(bs, num, -1)
+    batchsize, num_node, _ = input.shape
     
-    batchsize, num_node, seq_len = input.shape
     if args.graph_type == 'distance':
         path = args.marker_dir + '/electrode_graph/adj_mx_3d.pkl'
         if not os.path.exists(path):
             raise ValueError('adjacency matrix not found')
-        with open(args.adj_mat_path, 'rb') as f:
+        with open(path, 'rb') as f:
             adj_mat = pickle.load(f)
-            adj_mat = adj_mat[-1]
-        adj_mat = adj_mat.repeat(batchsize, 1, 1)
-        adj_mat = torch.FloatTensor(adj_mat).cuda()
+        adj_mat = torch.FloatTensor(adj_mat[-1]).cuda()
+        adj_mat = adj_mat.unsqueeze(dim=0).repeat(batchsize, 1, 1)
     elif args.graph_type == 'correlation':
         with torch.no_grad():
             adj_mat = input @ input.transpose(1, 2)

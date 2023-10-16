@@ -191,14 +191,14 @@ class Exp_SSL(Exp_Basic):
                     self.logging.add_scalar('train/loss', loss_val, self.steps)
                     self.logging.add_scalar('train/lr', model_optim.param_groups[0]['lr'], self.steps)
 
-                    saver.save(epoch, self.model, model_optim, loss_val)
+            saver.save(epoch, self.model, model_optim, loss_val)
 
-                    if (i+1) % self.args.eval_every == 0:
-                        vali_loss = self.vali(vali_loader, self.criterion)
-                        early_stopping(vali_loss, self.model, path)
-                        if early_stopping.early_stop:
-                            break
-                scheduler.step()
+            if (i+1) % self.args.eval_every == 0:
+                vali_loss = self.vali(vali_loader, self.criterion)
+                early_stopping(vali_loss, self.model, path)
+                if early_stopping.early_stop:
+                    break
+            scheduler.step()
         return
 
     def test(self, model_file:str='best.pth.tar'):

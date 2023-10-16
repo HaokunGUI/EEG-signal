@@ -84,7 +84,7 @@ if __name__ == '__main__':
     parser.add_argument('--dropout', type=float, default=0.5, help='Dropout probability.')
 
     # optimization
-    parser.add_argument('--num_epochs', type=int, default=40, help='train epochs')
+    parser.add_argument('--num_epochs', type=int, default=60, help='train epochs')
     parser.add_argument('--patience', type=int, default=3, help='early stopping patience')
     parser.add_argument('--learning_rate', type=float, default=1e-4, help='optimizer learning rate')
     parser.add_argument('--weight_decay', type=float, default=0.0, help='optimizer weight decay')
