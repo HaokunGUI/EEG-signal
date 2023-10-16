@@ -5,7 +5,7 @@ import numpy as np
 class DiffusionGraphConv(nn.Module):
     def __init__(self, num_supports, input_dim, hid_dim, num_nodes,
                  max_diffusion_step, output_dim, bias_start=0.0,
-                 filter_type='laplacian', device=None):
+                 filter_type='laplacian'):
         """
         Diffusion graph convolution
         Args:
@@ -25,14 +25,13 @@ class DiffusionGraphConv(nn.Module):
         self._num_nodes = num_nodes
         self._max_diffusion_step = max_diffusion_step
         self._filter_type = filter_type
-        self._device = device
         self.weight = nn.Parameter(
             torch.FloatTensor(
                 size=(
                     self._input_size *
                     num_matrices,
-                    output_dim))).to(self._device)
-        self.biases = nn.Parameter(torch.FloatTensor(size=(output_dim,))).to(self._device)
+                    output_dim))).cuda()
+        self.biases = nn.Parameter(torch.FloatTensor(size=(output_dim,))).cuda()
         nn.init.xavier_normal_(self.weight.data, gain=1.414)
         nn.init.constant_(self.biases.data, val=bias_start)
 
@@ -78,8 +77,7 @@ class DiffusionGraphConv(nn.Module):
                 for k in range(2, self._max_diffusion_step + 1):
                     # (batch, num_nodes, input_dim+hidden_dim)
                     x2 = 2 * torch.matmul(support, x1) - x0
-                    x = self._concat(
-                        x, x2)  # (batch, ?, num_nodes, input_dim+hidden_dim)
+                    x = self._concat(x, x2)  # (batch, ?, num_nodes, input_dim+hidden_dim)
                     x1, x0 = x2, x1
 
         num_matrices = len(supports) * \
@@ -88,9 +86,7 @@ class DiffusionGraphConv(nn.Module):
         x = torch.transpose(x, dim0=1, dim1=2)
         # (batch, num_nodes, input_hidden_size, num_matrices)
         x = torch.transpose(x, dim0=2, dim1=3)
-        x = torch.reshape(
-            x,
-            shape=[
+        x = torch.reshape(x, shape=[
                 batch_size,
                 self._num_nodes,
                 input_size *
@@ -114,8 +110,7 @@ class DCGRUCell(nn.Module):
             num_nodes,
             filter_type="laplacian",
             nonlinearity='tanh',
-            use_gc_for_ru=True,
-            device=None):
+            use_gc_for_ru=True):
         """
         Args:
             input_dim: input feature dim
@@ -132,7 +127,6 @@ class DCGRUCell(nn.Module):
         self._num_units = num_units
         self._max_diffusion_step = max_diffusion_step
         self._use_gc_for_ru = use_gc_for_ru
-        self._device = device
         if filter_type == "laplacian":  # ChebNet graph conv
             self._num_supports = 1
         elif filter_type == "random_walk":  # Forward random walk
@@ -201,4 +195,4 @@ class DCGRUCell(nn.Module):
 
     def init_hidden(self, batch_size):
         # state: (B, num_nodes * num_units)
-        return torch.zeros(batch_size, self._num_nodes * self._num_units).to(self._device)
+        return torch.zeros(batch_size, self._num_nodes * self._num_units).cuda()

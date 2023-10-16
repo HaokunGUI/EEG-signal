@@ -65,7 +65,7 @@ def draw_graph_weighted_edge(
         fig_size: figure size
 
     """
-    adj_mx = adj_mx[0]
+    adj_mx = adj_mx[0].cpu().numpy()
     eeg_viz = nx.DiGraph() if is_directed else nx.Graph()
     node_id_label = collections.defaultdict()
 

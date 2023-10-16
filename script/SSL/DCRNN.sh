@@ -1,8 +1,9 @@
-python run.py \
+torchrun \
+    --standalone \
+    --nproc_per_node=4 \
+    run.py \
     --task_name ssl \
     --model DCRNN \
     --use_curriculum_learning \
-    --use_fft \
-    --use_multi_gpu \
-    --devices '0,1,2' \
+    --graph_type distance \
     --normalize

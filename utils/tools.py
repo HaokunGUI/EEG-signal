@@ -1,10 +1,10 @@
 import os
-
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
 import random
 from scipy.signal import resample
+from torch.distributed import init_process_group, destroy_process_group
 
 plt.switch_backend('agg')
 
@@ -24,7 +24,6 @@ class EarlyStopping:
             self.best_score = score
         elif score < self.best_score + self.delta:
             self.counter += 1
-            print(f'EarlyStopping counter: {self.counter} out of {self.patience}')
             if self.counter >= self.patience:
                 self.early_stop = True
         else:
@@ -51,8 +50,6 @@ class StandardScaler:
         Args:
             data: data for inverse scaling
             is_tensor: whether data is a tensor
-            device: device
-            mask: shape (batch_size,) nodes where some signals are masked
         """
         mean = self.mean.copy()
         std = self.std.copy()
@@ -125,9 +122,30 @@ def resampleData(signals, to_freq=200, window_size=4):
 def seed_torch(seed=1029):
 	random.seed(seed)
 	os.environ['PYTHONHASHSEED'] = str(seed) # 为了禁止hash随机化，使得实验可复现
-	np.random.seed(seed)
+	# np.random.seed(seed)
 	torch.manual_seed(seed)
 	torch.cuda.manual_seed(seed)
 	torch.cuda.manual_seed_all(seed) # if you are using multi-GPU.
 	torch.backends.cudnn.benchmark = False
 	torch.backends.cudnn.deterministic = True
+
+def ddp_setup():
+    init_process_group(backend="nccl")
+    torch.cuda.set_device(int(os.environ["LOCAL_RANK"]))
+
+def ddp_cleanup():
+    destroy_process_group()
+
+class WriterFilter:
+    def __init__(self, working_class):
+        self.working_class = working_class
+        self.filter_methods = lambda : int(os.environ["LOCAL_RANK"]) == 0
+
+    def __getattr__(self, name):
+        # rewrite __getattr__ methods
+        if self.filter_methods():
+            return getattr(self.working_class, name)
+        else:
+            return self._filter_method
+    def _filter_method(self, *args, **kwargs):
+        return

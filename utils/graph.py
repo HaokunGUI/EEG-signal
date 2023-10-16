@@ -5,8 +5,14 @@ import numpy as np
 import scipy.sparse as sp
 import scipy.sparse.linalg as linalg
 import os
+import torch.sparse as sparse
 
 def get_supports(args:argparse.Namespace, input: torch.Tensor):
+    if len(input.shape) == 4:
+        bs, sl, num, lens = input.shape
+        input = input.permute(0, 2, 1, 3).reshape(bs, num, -1)
+    
+    batchsize, num_node, seq_len = input.shape
     if args.graph_type == 'distance':
         path = args.marker_dir + '/electrode_graph/adj_mx_3d.pkl'
         if not os.path.exists(path):
@@ -14,46 +20,34 @@ def get_supports(args:argparse.Namespace, input: torch.Tensor):
         with open(args.adj_mat_path, 'rb') as f:
             adj_mat = pickle.load(f)
             adj_mat = adj_mat[-1]
-
+        adj_mat = adj_mat.repeat(batchsize, 1, 1)
+        adj_mat = torch.FloatTensor(adj_mat).cuda()
     elif args.graph_type == 'correlation':
         with torch.no_grad():
-            seq_num, num_node, seq_len = input.shape
-            inputs = input.permute(1, 0, 2).reshape(num_node, seq_num*seq_len)
-            inputs = np.array(inputs.cpu())
-            adj_mat = np.zeros((num_node, num_node))
-            for j in range(num_node):
-                for k in range(num_node):
-                    adj_mat[j][k] = np.correlate(inputs[j], inputs[k], mode='valid')
-
+            adj_mat = input @ input.transpose(1, 2)
             if args.normalize:
-                corr_x = np.sum(inputs**2, axis=-1).reshape(1, num_node)
-                corr_y = np.sum(inputs**2, axis=-1).reshape(num_node, 1)
-                scale = np.sqrt(corr_x * corr_y)
+                corr_x = torch.sum(input**2, axis=-1).reshape(batchsize, 1, num_node)
+                corr_y = torch.sum(input**2, axis=-1).reshape(batchsize, num_node, 1)
+                scale = torch.sqrt(corr_x * corr_y)
                 adj_mat /= scale
-            adj_mat = abs(adj_mat)
-
+            adj_mat = torch.abs(adj_mat)
             if args.top_k is not None:
                 k = args.top_k
-                adj_mat_no_self_edge = np.copy(adj_mat)
-                np.fill_diagonal(adj_mat_no_self_edge, 0)
+                adj_mat_no_self_edge = adj_mat.clone().cuda()
+                diagnol = torch.eye(num_node).reshape(1, num_node, num_node).repeat(batchsize, 1, 1).cuda()
+                adj_mat_no_self_edge -= diagnol * adj_mat_no_self_edge
 
-                # Find the indices of the top-k elements in each row
-                top_k_idx = np.argsort(-adj_mat_no_self_edge, axis=1)[:, :k]
-
-                # Create a mask with the same shape as the adjacency matrix
-                mask = np.zeros_like(adj_mat, dtype=bool)
-
-                # Set the mask values based on the top-k indices
-                rows, cols = np.indices(top_k_idx.shape)
-                mask[rows, top_k_idx] = True
+                _, topk_idx = torch.topk(adj_mat_no_self_edge, k=k, dim=-1)
+                mask = torch.zeros_like(adj_mat_no_self_edge).cuda()
+                mask.scatter_(-1, topk_idx, 1)
 
                 # Symmetric mask if not directed
                 if not args.directed:
-                    mask = np.logical_or(mask, mask.T)
-                np.fill_diagonal(mask, 1)
+                    mask = torch.logical_or(mask, mask.transpose(1, 2))
+                mask = torch.logical_or(mask, diagnol)
 
                 # Apply the mask to the adjacency matrix
-                adj_mat = adj_mat * mask    
+                adj_mat = adj_mat * mask
     else:
         raise ValueError('Unknown graph type')
     
@@ -63,59 +57,59 @@ def get_supports(args:argparse.Namespace, input: torch.Tensor):
     if args.filter_type == "laplacian":  # ChebNet graph conv
         supports_mat.append(calculate_scaled_laplacian(adj_mat, lambda_max=None))
     elif args.filter_type == "random_walk":  # Forward random walk
-        supports_mat.append(calculate_random_walk_matrix(adj_mat).T)
+        supports_mat.append(calculate_random_walk_matrix(adj_mat).transpose(1, 2))
     elif args.filter_type == "dual_random_walk":  # Bidirectional random walk
-        supports_mat.append(calculate_random_walk_matrix(adj_mat).T)
-        supports_mat.append(calculate_random_walk_matrix(adj_mat.T).T)
+        supports_mat.append(calculate_random_walk_matrix(adj_mat).transpose(1, 2))
+        supports_mat.append(calculate_random_walk_matrix(adj_mat.transpose(1, 2)).transpose(1, 2))
     else:
         supports_mat.append(calculate_scaled_laplacian(adj_mat))
     for support in supports_mat:
-        supports.append(torch.FloatTensor(support.toarray()))
+        supports.append(support)
     
     return adj_mat, supports
 
-def calculate_normalized_laplacian(adj):
+def calculate_normalized_laplacian(adj:torch.Tensor):
     """
     # L = D^-1/2 (D-A) D^-1/2 = I - D^-1/2 A D^-1/2
     # D = diag(A 1)
     """
-    adj = sp.coo_matrix(adj)
-    d = np.array(adj.sum(1))
-    d_inv_sqrt = np.power(d, -0.5).flatten()
-    d_inv_sqrt[np.isinf(d_inv_sqrt)] = 0.
-    d_mat_inv_sqrt = sp.diags(d_inv_sqrt)
-    normalized_laplacian = sp.eye(adj.shape[0]) \
-        - d_mat_inv_sqrt.dot(adj).dot(d_mat_inv_sqrt).tocoo()
+    batch_size = adj.shape[0]
+    d = adj.sum(dim=-1)
+    d_inv_sqrt = d.pow(-0.5).reshape(batch_size, -1)
+    d_inv_sqrt[torch.isinf(d_inv_sqrt)] = 0.
+    d_inv_sqrt = torch.diag_embed(d_inv_sqrt).cuda()
+    normalized_laplacian = -d_inv_sqrt.bmm(adj).to_sparse().bmm(d_inv_sqrt) + \
+    torch.eye(adj.shape[1]).repeat(batch_size, 1, 1).to_sparse().cuda()
+
     return normalized_laplacian
 
-def calculate_random_walk_matrix(adj_mx):
+def calculate_random_walk_matrix(adj_mx:torch.Tensor):
     """
     State transition matrix D_o^-1W in paper.
     """
-    adj_mx = sp.coo_matrix(adj_mx)
-    d = np.array(adj_mx.sum(1))
-    d_inv = np.power(d, -1).flatten()
-    d_inv[np.isinf(d_inv)] = 0.
-    d_mat_inv = sp.diags(d_inv)
-    random_walk_mx = d_mat_inv.dot(adj_mx).tocoo()
+    batch_size = adj_mx.shape[0]
+    d = adj_mx.sum(dim=-1)
+    d_inv = d.pow(-1).reshape(batch_size, -1)
+    d_inv[torch.isinf(d_inv)] = 0.
+    d_mat_inv = torch.diag_embed(d_inv)
+    random_walk_mx = d_mat_inv.bmm(adj_mx)
     return random_walk_mx
 
-def calculate_scaled_laplacian(adj_mx, lambda_max=2, undirected=True):
+def calculate_scaled_laplacian(adj_mx: torch.Tensor, lambda_max=2, undirected=True):
     """
     Scaled Laplacian for ChebNet graph convolution
     """
     if undirected:
-        adj_mx = np.maximum.reduce([adj_mx, adj_mx.T])
-    L = calculate_normalized_laplacian(adj_mx)  # L is coo matrix
+        adj_mx, _ = torch.max(torch.stack([adj_mx, adj_mx.t()]), dim=0)
+    L = calculate_normalized_laplacian(adj_mx)  
     if lambda_max is None:
-        lambda_max, _ = linalg.eigsh(L, 1, which='LM')
-        lambda_max = lambda_max[0]
-    # L = sp.csr_matrix(L)
-    M, _ = L.shape
-    I = sp.identity(M, format='coo', dtype=L.dtype)
+        lambda_max, _ = torch.linalg.eigvalsh(L)
+        lambda_max = lambda_max[-1]
+    
+    batch_size, node_num, _ = adj_mx
+    I = torch.eye(node_num).repeat(batch_size, 1, 1).cuda()
     L = (2 / lambda_max * L) - I
-    # return L.astype(np.float32)
-    return L.tocoo()
+    return L
 
 
         

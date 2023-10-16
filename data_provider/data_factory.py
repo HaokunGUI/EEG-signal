@@ -1,5 +1,8 @@
 from data_provider.data_loader import Dataset_TUSZ
 from torch.utils.data import DataLoader
+from torch.utils.data.distributed import DistributedSampler
+from torch.utils.data.sampler import RandomSampler
+
 import argparse
 
 data_dict = {
@@ -20,7 +23,10 @@ def data_provider(args: argparse.Namespace, scalar=None):
         DataLoader(
             dataset=dataset,
             batch_size=batch_size,
-            shuffle=shuffle,
+            shuffle=False,
             num_workers=args.num_workers,
+            sampler=DistributedSampler(dataset, shuffle=shuffle) \
+                if args.use_gpu else \
+                RandomSampler(dataset, shuffle=shuffle)
         )
     

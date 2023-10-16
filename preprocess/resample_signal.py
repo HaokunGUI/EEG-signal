@@ -1,4 +1,7 @@
-from utils.constants import INCLUDED_CHANNELS, FREQUENCY
+import sys
+sys.path.append("/home/guihaokun/Time-Series-Pretrain")
+
+from utils.constants import INCLUDED_CHANNELS
 from utils.tools import resampleData, getEDFsignals, getOrderedChannels
 from tqdm import tqdm
 import argparse
@@ -7,8 +10,7 @@ import os
 import pyedflib
 import h5py
 
-
-def resample_all(raw_edf_dir, save_dir):
+def resample_all(raw_edf_dir, save_dir, freq:int=None):
     edf_files = []
     for path, subdirs, files in os.walk(raw_edf_dir):
         for name in files:
@@ -25,26 +27,37 @@ def resample_all(raw_edf_dir, save_dir):
         try:
             f = pyedflib.EdfReader(edf_fn)
 
+            sample_freq = f.getSampleFrequency(0)
+            freq = sample_freq if freq is None else freq
+            resample = True if sample_freq != freq else False
+
             orderedChannels = getOrderedChannels(
                 edf_fn, False, f.getSignalLabels(), INCLUDED_CHANNELS
             )
             signals = getEDFsignals(f)
             signal_array = np.array(signals[orderedChannels, :])
-            sample_freq = f.getSampleFrequency(0)
-            if sample_freq != FREQUENCY:
+
+            ordered_channel_freqs = set()
+            for channel in orderedChannels:
+                channel_freq = f.getSampleFrequency(channel)
+                ordered_channel_freqs.add(channel_freq)
+            f.close()
+
+            if len(ordered_channel_freqs) != 1:
+                resample = True
+            if resample:
                 signal_array = resampleData(
                     signal_array,
-                    to_freq=FREQUENCY,
+                    to_freq=freq,
                     window_size=int(signal_array.shape[1] / sample_freq),
                 )
 
             with h5py.File(save_fn, "w") as hf:
-                hf.create_dataset("resampled_signal", data=signal_array)
-                hf.create_dataset("resample_freq", data=FREQUENCY)
-            
-            f.close()
+                hf.create_dataset("resample_signal", data=signal_array)
+                hf.create_dataset("resample_freq", data=freq)
 
-        except BaseException:
+        except Exception as e:
+            print("Error occur:", str(e))
             failed_files.append(edf_fn)
 
     print("DONE. {} files failed.".format(len(failed_files)))
@@ -65,7 +78,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--save_dir",
         type=str,
-        default='/data/guihaokun/processed_data',
+        default='/data/guihaokun/resample/tuh_eeg_serizure',
         help="Full path to dir to save resampled signals.",
     )
     args = parser.parse_args()

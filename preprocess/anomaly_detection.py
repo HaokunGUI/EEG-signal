@@ -42,7 +42,7 @@ def markSeizureSlice(
 ):
     file_path = os.path.join(h5_dir, edf_path.split('/')[-1].split('.edf')[0] + '.h5')
     with h5py.File(file_path, 'r') as f:
-        signal_array = f["resampled_signal"][()]
+        signal_array = f["resample_signal"][()]
         freq = f["resample_freq"][()]
 
     # get seizure times

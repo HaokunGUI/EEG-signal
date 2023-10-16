@@ -2,6 +2,7 @@ import os
 import torch
 from models import TimesNet, DCRNN
 from tensorboardX import SummaryWriter
+from utils.tools import WriterFilter
 
 
 class Exp_Basic(object):
@@ -12,25 +13,30 @@ class Exp_Basic(object):
             'DCRNN': DCRNN,
         }
         self.device = self._acquire_device()
-        self.model = self._build_model().to(self.device)
+        self.model = self._build_model()
+        self.scalar = self._get_scalar()
+        self.world_size = int(os.environ["WORLD_SIZE"])
         logging_dir = os.path.join(self.args.log_dir, self.args.model, self.args.task_name, 'log')
-        if not os.path.exists(logging_dir):
-            os.makedirs(logging_dir)
-        self.logging = SummaryWriter(logging_dir)
+        os.makedirs(logging_dir, exist_ok=True)
+        self.logging = WriterFilter(SummaryWriter(logging_dir))
+        self.criterion = self._select_criterion()
+
+    def _select_criterion(self):
+        raise NotImplementedError
 
     def _build_model(self):
         raise NotImplementedError
 
     def _acquire_device(self):
         if self.args.use_gpu:
-            os.environ["CUDA_VISIBLE_DEVICES"] = str(
-                self.args.gpu) if not self.args.use_multi_gpu else self.args.devices
-            device = torch.device('cuda:{}'.format(self.args.gpu))
-            print('Use GPU: cuda:{}'.format(self.args.gpu))
+            os.environ["CUDA_VISIBLE_DEVICES"] = self.args.devices
+            device = int(os.environ["LOCAL_RANK"])
         else:
             device = torch.device('cpu')
-            print('Use CPU')
         return device
+    
+    def _get_scalar(self):
+        raise NotImplementedError
 
     def _get_data(self):
         pass

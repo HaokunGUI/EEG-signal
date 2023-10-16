@@ -17,7 +17,7 @@ class CheckpointSaver:
         log (logging.Logger): Optional logger for printing information.
     """
 
-    def __init__(self, save_dir, metric_name, maximize_metric=False):
+    def __init__(self, save_dir, metric_name, maximize_metric=False, fn=lambda : int(os.environ["LOCAL_RANK"])==0):
         super(CheckpointSaver, self).__init__()
 
         self.save_dir = save_dir
@@ -25,6 +25,7 @@ class CheckpointSaver:
         self.maximize_metric = maximize_metric
         self.best_val = None
         self.ckpt_paths = queue.PriorityQueue()
+        self.fn = fn
         self._print('Saver will {}imize {}...'
                     .format('max' if maximize_metric else 'min', metric_name))
 
@@ -56,6 +57,9 @@ class CheckpointSaver:
             optimizer: optimizer
             metric_val (float): Determines whether checkpoint is best so far.
         """
+        if not self.fn():
+            return
+        
         ckpt_dict = {
             'epoch': epoch,
             'model_state': model.state_dict(),
@@ -74,11 +78,14 @@ class CheckpointSaver:
             self._print('New best checkpoint at epoch {}...'.format(epoch))
 
 
-def load_model_checkpoint(checkpoint_file, model, optimizer=None):
-    checkpoint = torch.load(checkpoint_file)
+def load_model_checkpoint(checkpoint_file, model, optimizer=None, map_location=None):
+    if map_location is not None:
+        loc = f'cuda:{map_location}'
+        checkpoint = torch.load(checkpoint_file, map_location=loc)
+    else:
+        checkpoint = torch.load(checkpoint_file)
     model.load_state_dict(checkpoint['model_state'])
     if optimizer is not None:
         optimizer.load_state_dict(checkpoint['optimizer_state'])
         return model, optimizer
-
     return model

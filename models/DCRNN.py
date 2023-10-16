@@ -8,13 +8,9 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 from layers.DCRNN_EncDec import DCGRUCell
-from torch.autograd import Variable
 from utils.tools import *
-import numpy as np
-import pickle
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import random
 import argparse
 
@@ -33,13 +29,7 @@ def concat_tuple(tups, dim=0):
     """
     if isinstance(tups[0], tuple):
         return tuple(
-            (torch.cat(
-                xs,
-                dim) if isinstance(
-                xs[0],
-                torch.Tensor) else xs[0]) for xs in zip(
-                *
-                tups))
+            (torch.cat(xs, dim) if isinstance(xs[0], torch.Tensor) else xs[0]) for xs in zip(*tups))
     else:
         return torch.cat(tups, dim)
 
@@ -47,12 +37,10 @@ def concat_tuple(tups, dim=0):
 class DCRNNEncoder(nn.Module):
     def __init__(self, input_dim, max_diffusion_step,
                  hid_dim, num_nodes, num_rnn_layers,
-                 dcgru_activation=None, filter_type='laplacian',
-                 device=None):
+                 dcgru_activation=None, filter_type='laplacian'):
         super(DCRNNEncoder, self).__init__()
         self.hid_dim = hid_dim
         self.num_rnn_layers = num_rnn_layers
-        self._device = device
 
         encoding_cells = list()
         # the first layer has different input_dim
@@ -63,8 +51,7 @@ class DCRNNEncoder(nn.Module):
                 max_diffusion_step=max_diffusion_step,
                 num_nodes=num_nodes,
                 nonlinearity=dcgru_activation,
-                filter_type=filter_type,
-                device=self._device))
+                filter_type=filter_type))
 
         # construct multi-layer rnn
         for _ in range(1, num_rnn_layers):
@@ -75,8 +62,7 @@ class DCRNNEncoder(nn.Module):
                     max_diffusion_step=max_diffusion_step,
                     num_nodes=num_nodes,
                     nonlinearity=dcgru_activation,
-                    filter_type=filter_type,
-                    device=self._device))
+                    filter_type=filter_type))
         self.encoding_cells = nn.ModuleList(encoding_cells)
 
     def forward(self, inputs, initial_hidden_state, supports):
@@ -111,7 +97,7 @@ class DCRNNEncoder(nn.Module):
 class DCGRUDecoder(nn.Module):
     def __init__(self, input_dim, max_diffusion_step, num_nodes,
                  hid_dim, output_dim, num_rnn_layers, dcgru_activation=None,
-                 filter_type='laplacian', device=None, dropout=0.0):
+                 filter_type='laplacian', dropout=0.0):
         super(DCGRUDecoder, self).__init__()
 
         self.input_dim = input_dim
@@ -120,12 +106,11 @@ class DCGRUDecoder(nn.Module):
         self.output_dim = output_dim
         self.num_rnn_layers = num_rnn_layers
         self.dropout = dropout
-        self._device = device
 
         cell = DCGRUCell(input_dim=hid_dim, num_units=hid_dim,
                          max_diffusion_step=max_diffusion_step,
                          num_nodes=num_nodes, nonlinearity=dcgru_activation,
-                         filter_type=filter_type, device=self._device)
+                         filter_type=filter_type)
 
         decoding_cells = list()
         # first layer of the decoder
@@ -136,8 +121,7 @@ class DCGRUDecoder(nn.Module):
                 max_diffusion_step=max_diffusion_step,
                 num_nodes=num_nodes,
                 nonlinearity=dcgru_activation,
-                filter_type=filter_type, 
-                device=self._device))
+                filter_type=filter_type))
         # construct multi-layer rnn
         for _ in range(1, num_rnn_layers):
             decoding_cells.append(cell)
@@ -167,14 +151,14 @@ class DCGRUDecoder(nn.Module):
         go_symbol = torch.zeros(
             (batch_size,
              self.num_nodes *
-             self.output_dim)).to(self._device)
+             self.output_dim)).cuda()
 
         # tensor to store decoder outputs
         outputs = torch.zeros(
             seq_length,
             batch_size,
             self.num_nodes *
-            self.output_dim).to(self._device)
+            self.output_dim).cuda()
 
         current_input = go_symbol  # (batch_size, num_nodes * input_dim)
         for t in range(seq_length):
@@ -204,7 +188,7 @@ class DCGRUDecoder(nn.Module):
 
 ########## Model for seizure classification/detection ##########
 class DCRNNModel_classification(nn.Module):
-    def __init__(self, args, num_classes, device=None):
+    def __init__(self, args, num_classes):
         super(DCRNNModel_classification, self).__init__()
 
         num_nodes = args.num_nodes
@@ -217,15 +201,13 @@ class DCRNNModel_classification(nn.Module):
         self.num_rnn_layers = num_rnn_layers
         self.rnn_units = rnn_units
         self.num_classes = num_classes
-        self._device = device
 
         self.encoder = DCRNNEncoder(input_dim=enc_input_dim,
                                     max_diffusion_step=max_diffusion_step,
                                     hid_dim=rnn_units, num_nodes=num_nodes,
                                     num_rnn_layers=num_rnn_layers,
                                     dcgru_activation=args.dcgru_activation,
-                                    filter_type=args.filter_type,
-                                    device=self._device)
+                                    filter_type=args.filter_type)
 
         self.fc = nn.Linear(rnn_units, num_classes)
         self.dropout = nn.Dropout(args.dropout)
@@ -273,7 +255,7 @@ class DCRNNModel_classification(nn.Module):
 
 ########## Model for next time prediction ##########
 class DCRNNModel_nextTimePred(nn.Module):
-    def __init__(self, args, device=None):
+    def __init__(self, args):
         super(DCRNNModel_nextTimePred, self).__init__()
 
         num_nodes = args.num_nodes
@@ -290,15 +272,13 @@ class DCRNNModel_nextTimePred(nn.Module):
         self.output_dim = output_dim
         self.cl_decay_steps = args.cl_decay_steps
         self.use_curriculum_learning = bool(args.use_curriculum_learning)
-        self._device = device
 
         self.encoder = DCRNNEncoder(input_dim=enc_input_dim,
                                     max_diffusion_step=max_diffusion_step,
                                     hid_dim=rnn_units, num_nodes=num_nodes,
                                     num_rnn_layers=num_rnn_layers,
                                     dcgru_activation=args.dcgru_activation,
-                                    filter_type=args.filter_type,
-                                    device=self._device)
+                                    filter_type=args.filter_type)
         self.decoder = DCGRUDecoder(input_dim=dec_input_dim,
                                     max_diffusion_step=max_diffusion_step,
                                     num_nodes=num_nodes, hid_dim=rnn_units,
@@ -306,8 +286,7 @@ class DCRNNModel_nextTimePred(nn.Module):
                                     num_rnn_layers=num_rnn_layers,
                                     dcgru_activation=args.dcgru_activation,
                                     filter_type=args.filter_type,
-                                    dropout=args.dropout,
-                                    device=self._device)
+                                    dropout=args.dropout)
 
     def forward(
             self,
@@ -360,10 +339,10 @@ class DCRNNModel_nextTimePred(nn.Module):
 ########## Model for next time prediction ##########
 
 class Model(nn.Module):
-    def __init__(self, args:argparse.Namespace, device=None):
+    def __init__(self, args:argparse.Namespace):
         super(Model, self).__init__()
         if args.task_name == 'ssl':
-            self.model = DCRNNModel_nextTimePred(args, device)
+            self.model = DCRNNModel_nextTimePred(args)
         elif args.task_name == 'anomaly_detection':
             self.model = DCRNNModel_classification(args, num_classes=2)
         elif args.task_name == 'classification':
