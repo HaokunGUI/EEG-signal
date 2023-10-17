@@ -13,6 +13,7 @@ import torch
 import torch.nn as nn
 import random
 import argparse
+from utils.utils import last_relevant_pytorch
 
 def apply_tuple(tup, fn):
     """Apply a function to a Tensor or a tuple of Tensor
@@ -237,7 +238,7 @@ class DCRNNModel_classification(nn.Module):
         output = torch.transpose(final_hidden, dim0=0, dim1=1)
 
         # extract last relevant output
-        last_out = utils.last_relevant_pytorch(
+        last_out = last_relevant_pytorch(
             output, seq_lengths, batch_first=True)  # (batch_size, rnn_units*num_nodes)
         # (batch_size, num_nodes, rnn_units)
         last_out = last_out.view(batch_size, self.num_nodes, self.rnn_units)
@@ -341,14 +342,15 @@ class DCRNNModel_nextTimePred(nn.Module):
 class Model(nn.Module):
     def __init__(self, args:argparse.Namespace):
         super(Model, self).__init__()
+        self.args = args
         if args.task_name == 'ssl':
             self.model = DCRNNModel_nextTimePred(args)
         elif args.task_name == 'anomaly_detection':
-            self.model = DCRNNModel_classification(args, num_classes=2)
+            self.model = DCRNNModel_classification(args, num_classes=1)
         elif args.task_name == 'classification':
             self.model = DCRNNModel_classification(args, num_classes=args.num_classes)
         else:
             raise NotImplementedError
     
-    def forward(self, x:torch.Tensor, y:torch.Tensor, supports:torch.Tensor, batches_seen=None):
-        return self.model.forward(x, y, supports, batches_seen)
+    def forward(self, *args, **kwargs):
+        return self.model.forward(*args, **kwargs)

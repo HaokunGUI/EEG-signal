@@ -75,16 +75,18 @@ class Exp_SSL(Exp_Basic):
                 x = x.float().to(self.device)
                 y = y.float().to(self.device)
 
-                batch_size, node_num, seq_len = x.shape
-                x = x.reshape(batch_size, node_num, -1, self.args.freq)
-                x = x.permute(0, 2, 1, 3)
+                if self.args.using_patch:
+                    batch_size, node_num, seq_len = x.shape
+                    x = x.reshape(batch_size, node_num, -1, self.args.freq)
+                    x = x.permute(0, 2, 1, 3)
 
-                y = y.reshape(batch_size, node_num, -1, self.args.freq)
-                y = y.permute(0, 2, 1, 3)
+                    y = y.reshape(batch_size, node_num, -1, self.args.freq)
+                    y = y.permute(0, 2, 1, 3)
+
                 if self.args.use_fft:
-                    x = torch.fft.rfft(x)[..., :self.args.freq//2]
+                    x = torch.fft.rfft(x)[..., :self.args.input_dim]
                     x = torch.log(torch.abs(x) + 1e-8)
-                    y = torch.fft.rfft(y)[..., :self.args.freq//2]
+                    y = torch.fft.rfft(y)[..., :self.args.output_dim]
                     y = torch.log(torch.abs(y) + 1e-8)
 
                 # get adjmat, supports
@@ -132,7 +134,7 @@ class Exp_SSL(Exp_Basic):
 
             with tqdm(train_loader.dataset, desc=f'Epoch: {epoch + 1} / {self.args.num_epochs}', \
                                               disable=(self.device != 0)) as progress_bar:
-                for i, (x, y) in enumerate(train_loader):
+                for x, y in train_loader:
                     model_optim.zero_grad()
 
                     batch_size = x.size(0)
@@ -140,39 +142,41 @@ class Exp_SSL(Exp_Basic):
                     y = y.float().to(self.device)
 
                     with torch.no_grad():
-                        batch_size, node_num, seq_len = x.shape
-                        x = x.reshape(batch_size, node_num, -1, self.args.freq)
-                        x = x.permute(0, 2, 1, 3)
+                        if self.args.using_patch:
+                            batch_size, node_num, seq_len = x.shape
+                            x = x.reshape(batch_size, node_num, -1, self.args.freq)
+                            x = x.permute(0, 2, 1, 3)
 
-                        y = y.reshape(batch_size, node_num, -1, self.args.freq)
-                        y = y.permute(0, 2, 1, 3)
+                            y = y.reshape(batch_size, node_num, -1, self.args.freq)
+                            y = y.permute(0, 2, 1, 3)
+
                         if self.args.use_fft:
-                            x = torch.fft.rfft(x)[..., :self.args.freq//2]
+                            x = torch.fft.rfft(x)[..., :self.args.input_dim]
                             x = torch.log(torch.abs(x) + 1e-8)
-                            y = torch.fft.rfft(y)[..., :self.args.freq//2]
+                            y = torch.fft.rfft(y)[..., :self.args.output_dim]
                             y = torch.log(torch.abs(y) + 1e-8)
-                    # get adjmat, supports
-                    if self.args.use_graph:
-                        adj_mat, supports = get_supports(self.args, x)
-                    else:
-                        supports = None
+                        # get adjmat, supports
+                        if self.args.use_graph:
+                            adj_mat, supports = get_supports(self.args, x)
+                        else:
+                            supports = None
 
-                    if self.args.use_graph and start_draw:
-                        if self.args.graph_type == 'distance' and self.args.adj_every > 0:
-                            pos_spec = get_spectral_graph_positions(self.args.marker_dir)
-                            fig = draw_graph_weighted_edge(adj_mat, NODE_ID_DICT, pos_spec, title=f'distance_epoch{epoch}.png', 
+                        if self.args.use_graph and start_draw:
+                            if self.args.graph_type == 'distance' and self.args.adj_every > 0:
+                                pos_spec = get_spectral_graph_positions(self.args.marker_dir)
+                                fig = draw_graph_weighted_edge(adj_mat, NODE_ID_DICT, pos_spec, title=f'distance_epoch{epoch}.png', 
                                                      is_directed=False, plot_colorbar=True, font_size=30,
                                                      save_dir=os.path.join(self.logging_dir, 'graph'))
-                            self.args.adj_every = 0
-                            self.logging.add_figure('graph/distance', fig, epoch)
-                            start_draw = False
-                        elif self.args.graph_type == 'correlation' and (epoch % self.args.adj_every == 0):
-                            pos_spec = get_spectral_graph_positions(self.args.marker_dir)
-                            fig = draw_graph_weighted_edge(adj_mat, NODE_ID_DICT, pos_spec, title=f'correlation_epoch{epoch}.png', 
+                                self.args.adj_every = 0
+                                self.logging.add_figure('graph/distance', fig, epoch)
+                                start_draw = False
+                            elif self.args.graph_type == 'correlation' and (epoch % self.args.adj_every == 0):
+                                pos_spec = get_spectral_graph_positions(self.args.marker_dir)
+                                fig = draw_graph_weighted_edge(adj_mat, NODE_ID_DICT, pos_spec, title=f'correlation_epoch{epoch}.png', 
                                                      is_directed=self.args.directed, plot_colorbar=True, font_size=30, 
                                                      save_dir=os.path.join(self.logging_dir, 'graph'))
-                            self.logging.add_figure(f'graph/correlation_{epoch}', fig, epoch)
-                            start_draw = False
+                                self.logging.add_figure(f'graph/correlation_{epoch}', fig, epoch)
+                                start_draw = False
 
                     seq_pred = self.model(x, y, supports, self.steps)
 
@@ -192,7 +196,7 @@ class Exp_SSL(Exp_Basic):
 
             saver.save(epoch, self.model, model_optim, loss_val)
 
-            if (i+1) % self.args.eval_every == 0:
+            if (epoch+1) % self.args.eval_every == 0:
                 vali_loss = self.vali(vali_loader, self.criterion)
                 self.logging.add_scalar('vali/loss', vali_loss, epoch)
                 early_stopping(vali_loss)
@@ -201,9 +205,12 @@ class Exp_SSL(Exp_Basic):
             scheduler.step()
         return
 
-    def test(self, model_file:str='best.pth.tar'):
+    def test(self, model_file:str='best.pth.tar', model_dir:str=None):
         _, test_loader = self._get_data(flag='eval')
-        path = os.path.join(self.args.log_dir, self.args.model, self.args.task_name, 'checkpoint', model_file)
+        if model_dir is None:
+            path = os.path.join(self.logging_dir, 'checkpoint', model_file)
+        else:
+            path = os.path.join(model_dir, model_file)
         load_model_checkpoint(path, self.model, map_location=self.device)
 
         criterion = self._select_criterion()
@@ -215,16 +222,18 @@ class Exp_SSL(Exp_Basic):
                 x = x.float().to(self.device)
                 y = y.float().to(self.device)
 
-                batch_size, node_num, seq_len = x.shape
-                x = x.reshape(batch_size, node_num, -1, self.args.freq)
-                x = x.permute(0, 2, 1, 3)
+                if self.args.using_patch:
+                    batch_size, node_num, seq_len = x.shape
+                    x = x.reshape(batch_size, node_num, -1, self.args.freq)
+                    x = x.permute(0, 2, 1, 3)
 
-                y = y.reshape(batch_size, node_num, -1, self.args.freq)
-                y = y.permute(0, 2, 1, 3)
+                    y = y.reshape(batch_size, node_num, -1, self.args.freq)
+                    y = y.permute(0, 2, 1, 3)
+
                 if self.args.use_fft:
-                    x = torch.fft.rfft(x)[..., :self.args.freq//2]
+                    x = torch.fft.rfft(x)[..., :self.args.input_dim]
                     x = torch.log(torch.abs(x) + 1e-8)
-                    y = torch.fft.rfft(y)[..., :self.args.freq//2]
+                    y = torch.fft.rfft(y)[..., :self.args.output_dim]
                     y = torch.log(torch.abs(y) + 1e-8)
 
                 # get adjmat, supports

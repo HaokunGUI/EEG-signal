@@ -84,8 +84,17 @@ def load_model_checkpoint(checkpoint_file, model, optimizer=None, map_location=N
         checkpoint = torch.load(checkpoint_file, map_location=loc)
     else:
         checkpoint = torch.load(checkpoint_file)
-    model.load_state_dict(checkpoint['model_state'])
+    model.load_state_dict(checkpoint['model_state'], strict=False)
     if optimizer is not None:
         optimizer.load_state_dict(checkpoint['optimizer_state'])
         return model, optimizer
     return model
+
+def last_relevant_pytorch(output, lengths, batch_first=True):
+    # masks of the true seq lengths
+    masks = (lengths - 1).view(-1, 1).expand(len(lengths), output.size(2)).cuda()
+    time_dimension = 1 if batch_first else 0
+    masks = masks.unsqueeze(time_dimension)
+    last_output = output.gather(time_dimension, masks).squeeze(time_dimension).cuda()
+
+    return last_output

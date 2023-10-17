@@ -41,19 +41,20 @@ class Dataset_TUSZ(Dataset):
                 with open(os.path.join(self.marker_dir, sz_file_name), 'r') as f_sz:
                     f_nosz_str = f_nosz.readlines()
                     f_sz_str = f_sz.readlines()
-            if self.split == 'train':
+            if self.split == 'train' and self.args.balanced:
                 num_points = int(self.args.scale_ratio * len(f_sz_str))
                 np.random.shuffle(f_nosz_str)
                 f_nosz_str = f_nosz_str[:num_points]
                 np.random.shuffle(f_sz_str)
                 f_sz_str = f_sz_str[:num_points]
-                f_combine_str = f_nosz_str + f_sz_str
-                np.random.shuffle(f_combine_str)
-                for i in range(len(f_combine_str)):
-                    f_combine_str[i] = f_combine_str[i].strip('\n').split(',')
-
-
-            file_path = os.path.join(self.marker_dir, file_name)
+            f_combine_str = f_nosz_str + f_sz_str
+            np.random.shuffle(f_combine_str)
+            self.file_tuples = []
+            for i in range(len(f_combine_str)):
+                tup = f_combine_str[i].strip('\n').split(',')
+                tup[1] = int(tup[1])
+                self.file_tuples.append(tup)
+            self.size = len(self.file_tuples)
 
         elif self.task_name == 'classification':
             pass
@@ -79,7 +80,16 @@ class Dataset_TUSZ(Dataset):
             y = torch.Tensor(y)
         
         elif self.task_name == 'anomaly_detection':
-            pass
+            file_name, label = self.file_tuples[index]
+            x = self._getSlice(file_name)
+            if self.data_augment:
+                # TODO
+                pass
+            if self.scalar is not None:
+                x = self.scalar.transform(x)
+            # convert to Tensor
+            x = torch.Tensor(x)
+            y = torch.Tensor([label])
 
         elif self.task_name == 'classification':
             pass
@@ -116,3 +126,16 @@ class Dataset_TUSZ(Dataset):
         # (num_channel, input_len)
         input_slice = signals[:, start_window:end_window]
         return input_slice[:, :input_node_num], input_slice[:, input_node_num:]
+    
+    def _getSlice(self, file_name:str):
+        slice_num = int(file_name.split('_')[-1].split('.h5')[0])
+        file_name = file_name.split('.edf')[0] + '.h5'
+        file_path = os.path.join(self.root_path, file_name)
+        with h5py.File(file_path, 'r') as f:
+            signals = f["resample_signal"][()]
+            freq = f["resample_freq"][()]
+        input_node_num = int(freq * self.input_len)
+
+        start_window = input_node_num * slice_num
+        end_window = start_window + input_node_num
+        return signals[:, start_window:end_window]

@@ -32,7 +32,6 @@ class Exp_Basic(object):
 
     def _acquire_device(self):
         if self.args.use_gpu:
-            os.environ["CUDA_VISIBLE_DEVICES"] = self.args.devices
             device = int(os.environ["LOCAL_RANK"])
         else:
             device = torch.device('cpu')

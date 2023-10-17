@@ -53,9 +53,9 @@ if __name__ == '__main__':
     parser.add_argument('--marker_dir', type=str, default='/home/guihaokun/Time-Series-Pretrain/data', help='marker dir')
     parser.add_argument('--data_augment', action='store_true', help='use data augment or not', default=False)
     parser.add_argument('--normalize', action='store_true', help='normalize data or not', default=False)
-    parser.add_argument('--train_batch_size', type=int, default=256, help='batch size of train input data')
-    parser.add_argument('--test_batch_size', type=int, default=256, help='batch size of test input data')
-    parser.add_argument('--num_workers', type=int, default=24, help='data loader num workers')
+    parser.add_argument('--train_batch_size', type=int, default=64, help='batch size of train input data')
+    parser.add_argument('--test_batch_size', type=int, default=128, help='batch size of test input data')
+    parser.add_argument('--num_workers', type=int, default=16, help='data loader num workers')
     parser.add_argument('--freq', type=int, default=250, help='sample frequency')
 
     # ssl task
@@ -67,10 +67,11 @@ if __name__ == '__main__':
 
     # detection task
     parser.add_argument('--scale_ratio', type=float, default=1.0, help='scale ratio of train data')
+    parser.add_argument('--balanced', action='store_true', help='balanced data or not', default=False)
 
     # graph setting
     parser.add_argument('--graph_type', type=str, default='correlation', help='graph type, option:[distance, correlation]')
-    parser.add_argument('--top_k', type=int, default=3, help='top k')
+    parser.add_argument('--top_k', type=int, default=3, help='top k in graph or top k in TimesNet')
     parser.add_argument('--directed', action='store_true', help='directed graph or not', default=False)
     parser.add_argument('--filter_type', type=str, default='dual_random_walk', help='filter type')
 
@@ -85,13 +86,15 @@ if __name__ == '__main__':
     parser.add_argument('--cl_decay_steps', type=int, default=3000, help='Scheduled sampling decay steps.')
     parser.add_argument('--use_curriculum_learning', default=False, action='store_true', help='Whether to use curriculum training for seq-seq model.')
     parser.add_argument('--dropout', type=float, default=0.5, help='Dropout probability.')
+    parser.add_argument('--hidden_dim', type=int, default=1024, help='Hidden state dimension.')
+    parser.add_argument('--num_kernels', type=int, default=5, help='Number of each kind of kernel.')
 
     # optimization
     parser.add_argument('--num_epochs', type=int, default=60, help='train epochs')
     parser.add_argument('--patience', type=int, default=3, help='early stopping patience')
     parser.add_argument('--learning_rate', type=float, default=1e-3, help='optimizer learning rate')
     parser.add_argument('--weight_decay', type=float, default=0.0, help='optimizer weight decay')
-    parser.add_argument('--max_norm', type=float, default=4.0, help='max norm of grad')
+    parser.add_argument('--max_norm', type=float, default=1.0, help='max norm of grad')
 
     # GPU
     parser.add_argument('--use_gpu', type=bool, default=True, help='use gpu')
@@ -100,6 +103,10 @@ if __name__ == '__main__':
     # log setting
     parser.add_argument('--eval_every', type=int, default=5, help='evaluate every X epochs')
     parser.add_argument('--adj_every', type=int, default=10, help='display adj matrix every X epochs')
+
+    # pretrain
+    parser.add_argument('--use_pretrained', action='store_true', default=False, help='pretrain or not')
+    parser.add_argument('--pretrained_path', type=str, default=None, help='pretrain model path')
 
     args = parser.parse_args()
 
@@ -110,17 +117,27 @@ if __name__ == '__main__':
         device_ids = args.devices.split(',')
         args.device_ids = [int(id_) for id_ in device_ids]
         args.gpu = args.device_ids[0]
+        os.environ["CUDA_VISIBLE_DEVICES"] = args.devices
     
-    if args.graph_type in ['distance', 'correlation']:
+    if args.model in ['DCRNN']:
         args.use_graph = True
     else:
         args.use_graph = False
 
-    if args.use_fft:
-        args.input_dim = args.freq // 2
-        args.output_dim = args.freq // 2
+    if args.model in ['DCRNN']:
+        args.using_patch = True
     else:
+        args.using_patch = False
+
+    if args.using_patch:
         args.input_dim = args.freq
         args.output_dim = args.freq
+    else:
+        args.input_dim = args.freq * args.input_len
+        args.output_dim = args.freq * args.output_len
+    
+    if args.use_fft:
+        args.input_dim = args.input_dim // 2
+        args.output_dim = args.output_dim // 2
     
     main(args)
