@@ -6,4 +6,5 @@ torchrun \
     --model DCRNN \
     --use_curriculum_learning \
     --graph_type distance \
-    --normalize
+    --normalize \
+    --use_fft

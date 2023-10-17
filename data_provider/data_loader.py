@@ -5,6 +5,7 @@ import os
 from typing import Any, Tuple
 import h5py
 import torch
+import numpy as np
 
 warnings.filterwarnings('ignore')
 
@@ -40,8 +41,17 @@ class Dataset_TUSZ(Dataset):
                 with open(os.path.join(self.marker_dir, sz_file_name), 'r') as f_sz:
                     f_nosz_str = f_nosz.readlines()
                     f_sz_str = f_sz.readlines()
-                    if self.split == 'train':
-                        pass
+            if self.split == 'train':
+                num_points = int(self.args.scale_ratio * len(f_sz_str))
+                np.random.shuffle(f_nosz_str)
+                f_nosz_str = f_nosz_str[:num_points]
+                np.random.shuffle(f_sz_str)
+                f_sz_str = f_sz_str[:num_points]
+                f_combine_str = f_nosz_str + f_sz_str
+                np.random.shuffle(f_combine_str)
+                for i in range(len(f_combine_str)):
+                    f_combine_str[i] = f_combine_str[i].strip('\n').split(',')
+
 
             file_path = os.path.join(self.marker_dir, file_name)
 

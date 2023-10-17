@@ -55,7 +55,7 @@ if __name__ == '__main__':
     parser.add_argument('--normalize', action='store_true', help='normalize data or not', default=False)
     parser.add_argument('--train_batch_size', type=int, default=256, help='batch size of train input data')
     parser.add_argument('--test_batch_size', type=int, default=256, help='batch size of test input data')
-    parser.add_argument('--num_workers', type=int, default=16, help='data loader num workers')
+    parser.add_argument('--num_workers', type=int, default=24, help='data loader num workers')
     parser.add_argument('--freq', type=int, default=250, help='sample frequency')
 
     # ssl task
@@ -64,6 +64,9 @@ if __name__ == '__main__':
     parser.add_argument('--time_step_len', type=int, default=1, help='time step length')
     parser.add_argument('--use_fft', action='store_true', help='use fft or not', default=False)
     parser.add_argument('--loss_fn', type=str, default='mse', help='loss function, options:[mse, mae]')
+
+    # detection task
+    parser.add_argument('--scale_ratio', type=float, default=1.0, help='scale ratio of train data')
 
     # graph setting
     parser.add_argument('--graph_type', type=str, default='correlation', help='graph type, option:[distance, correlation]')
@@ -86,7 +89,7 @@ if __name__ == '__main__':
     # optimization
     parser.add_argument('--num_epochs', type=int, default=60, help='train epochs')
     parser.add_argument('--patience', type=int, default=3, help='early stopping patience')
-    parser.add_argument('--learning_rate', type=float, default=1e-4, help='optimizer learning rate')
+    parser.add_argument('--learning_rate', type=float, default=1e-3, help='optimizer learning rate')
     parser.add_argument('--weight_decay', type=float, default=0.0, help='optimizer weight decay')
     parser.add_argument('--max_norm', type=float, default=4.0, help='max norm of grad')
 

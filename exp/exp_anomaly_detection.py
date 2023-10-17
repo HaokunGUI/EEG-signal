@@ -17,43 +17,42 @@ from utils.tools import *
 from utils.visualize import *
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from utils.constants import *
+from torch.nn.parallel import DistributedDataParallel as DDP
+import os
 
 warnings.filterwarnings('ignore')
 
 class Exp_Anomaly_Detection(Exp_Basic):
     def __init__(self, args:argparse.Namespace):
         super(Exp_Anomaly_Detection, self).__init__(args)
-        self.scalar = self._get_scalar()
 
     def _build_model(self):
         # model init
-        model = self.model_dict[self.args.model].Model(self.args, self.device)
-        if self.args.use_multi_gpu and self.args.use_gpu:
-            model = nn.DataParallel(model, device_ids=self.args.device_ids).cuda()
+        model = self.model_dict[self.args.model].Model(self.args).cuda()
+        if self.args.use_gpu:
+            model = DDP(model, device_ids=[self.device])
         return model
     
     def _get_scalar(self):
         if self.args.normalize:
             means_dir = os.path.join(
-                self.args.marker_dir, f'file_markers_{self.args.task_name}', 
-                'means_seq2seq_fft_'+str(self.args.input_len)+'s_single.pkl'
+                self.args.marker_dir, 'means_seq2seq_nofft.pkl'
                 )
             stds_dir = os.path.join(
-                self.args.marker_dir, f'file_markers_{self.args.task_name}',
-                'stds_seq2seq_fft_'+str(self.args.input_len)+'s_single.pkl'
+                self.args.marker_dir, 'stds_seq2seq_nofft.pkl',
                 )
             with open(means_dir, 'rb') as f:
-                means = pickle.load(f)
+                means = pickle.load(f).reshape(-1, 1)
             with open(stds_dir, 'rb') as f:
-                stds = pickle.load(f)
+                stds = pickle.load(f).reshape(-1, 1)
             scalar = StandardScaler(mean=means, std=stds, device=self.device)
         else:
             scalar = None
         return scalar
 
-    def _get_data(self, flag, scalar):
+    def _get_data(self, flag):
         self.args.split = flag
-        data_set, data_loader = data_provider(self.args, scalar=scalar)
+        data_set, data_loader = data_provider(self.args, scalar=self.scalar)
         return data_set, data_loader
 
     def _select_optimizer(self):
@@ -72,17 +71,32 @@ class Exp_Anomaly_Detection(Exp_Basic):
         total_loss = []
         self.model.eval()
         with torch.no_grad():
-            for i, (x, y_true, _, supports) in tqdm(enumerate(vali_loader)):
+            for x, y in tqdm(vali_loader, disable=(self.device != 0)):
                 x = x.float().to(self.device)
-                y_true = y_true.float().to(self.device)
+                y = y.float().to(self.device)
+
+                batch_size, node_num, seq_len = x.shape
+                x = x.reshape(batch_size, node_num, -1, self.args.freq)
+                x = x.permute(0, 2, 1, 3)
+
+                y = y.reshape(batch_size, node_num, -1, self.args.freq)
+                y = y.permute(0, 2, 1, 3)
+                if self.args.use_fft:
+                    x = torch.fft.rfft(x)[..., :self.args.freq//2]
+                    x = torch.log(torch.abs(x) + 1e-8)
+                    y = torch.fft.rfft(y)[..., :self.args.freq//2]
+                    y = torch.log(torch.abs(y) + 1e-8)
+
+                # get adjmat, supports
                 if self.args.use_graph:
-                    for i in range(len(supports)):
-                        supports[i] = supports[i].to(self.device)
+                    _, supports = get_supports(self.args, x)
+                else:
+                    supports = None
 
-                y_pred = self.model(x, y_true, supports, None)
+                y_pred = self.model(x, y, supports, None)
 
-                y_pred = y_pred.detach().cpu()
-                loss = criterion(y_true.cpu(), y_pred)
+                y_pred = y_pred.detach()
+                loss = criterion(y, y_pred).cpu()
                 total_loss.append(loss.item())
 
         total_loss = np.average(total_loss)
@@ -92,48 +106,57 @@ class Exp_Anomaly_Detection(Exp_Basic):
         return total_loss
 
     def train(self):
-        _, train_loader = self._get_data(flag='train', scalar=self.scalar)
-        _, vali_loader = self._get_data(flag='dev', scalar=self.scalar)
+        _, train_loader = self._get_data(flag='train')
+        _, vali_loader = self._get_data(flag='dev')
 
         path = os.path.join(self.args.log_dir, self.args.model, self.args.task_name)
-        if not os.path.exists(path):
-            os.makedirs(path)
+        os.makedirs(path, exist_ok=True)
         checkpoint_dir = os.path.join(path, 'checkpoint')
-        if not os.path.exists(checkpoint_dir):
-            os.makedirs(checkpoint_dir)
+        os.makedirs(checkpoint_dir, exist_ok=True)
+        os.makedirs(os.path.join(self.args.log_dir, self.args.model, self.args.task_name, 'graph'), exist_ok=True)
 
         args_file = os.path.join(self.args.log_dir, self.args.model, self.args.task_name, 'args.json')
         with open(args_file, 'w') as f:
-            json.dump(vars(self.args), f, indent=4, sort_keys=True)
-
-        if self.args.use_graph and not os.path.exists(os.path.join(self.args.log_dir, self.args.model, self.args.task_name, 'graph')):
-            os.makedirs(os.path.join(self.args.log_dir, self.args.model, self.args.task_name, 'graph'))
+            if self.device == 0:
+                json.dump(vars(self.args), f, indent=4, sort_keys=True)
 
         early_stopping = EarlyStopping(patience=self.args.patience, verbose=True)
-
         model_optim = self._select_optimizer()
-        criterion = self._select_criterion()
         scheduler = self._select_scheduler(model_optim)
+        saver = CheckpointSaver(checkpoint_dir, metric_name=self.args.loss_fn,
+                                  maximize_metric=False)
 
-        for epoch in range(self.args.num_epochs):
+        for epoch in range(self.args.num_epochs): 
             start_draw = True
             self.steps = 0
             self.model.train()
 
-            saver = CheckpointSaver(checkpoint_dir,
-                                  metric_name=self.args.loss_fn,
-                                  maximize_metric=False)
-
-            with torch.enable_grad() and tqdm(train_loader.dataset, desc=f'Epoch: {epoch + 1} / {self.args.num_epochs}') as progress_bar:
-                for i, (x, y_true, adj_mat, supports) in enumerate(train_loader):
+            with tqdm(train_loader.dataset, desc=f'Epoch: {epoch + 1} / {self.args.num_epochs}', \
+                                              disable=(self.device != 0)) as progress_bar:
+                for i, (x, y) in enumerate(train_loader):
                     model_optim.zero_grad()
 
-                    x = x.float().to(self.device)
                     batch_size = x.size(0)
-                    y_true = y_true.to(self.device)
+                    x = x.float().to(self.device)
+                    y = y.float().to(self.device)
+
+                    with torch.no_grad():
+                        batch_size, node_num, seq_len = x.shape
+                        x = x.reshape(batch_size, node_num, -1, self.args.freq)
+                        x = x.permute(0, 2, 1, 3)
+
+                        y = y.reshape(batch_size, node_num, -1, self.args.freq)
+                        y = y.permute(0, 2, 1, 3)
+                        if self.args.use_fft:
+                            x = torch.fft.rfft(x)[..., :self.args.freq//2]
+                            x = torch.log(torch.abs(x) + 1e-8)
+                            y = torch.fft.rfft(y)[..., :self.args.freq//2]
+                            y = torch.log(torch.abs(y) + 1e-8)
+                    # get adjmat, supports
                     if self.args.use_graph:
-                        for i in range(len(supports)):
-                            supports[i] = supports[i].to(self.device)
+                        adj_mat, supports = get_supports(self.args, x)
+                    else:
+                        supports = None
 
                     if self.args.use_graph and start_draw:
                         if self.args.graph_type == 'distance' and self.args.adj_every > 0:
@@ -144,7 +167,7 @@ class Exp_Anomaly_Detection(Exp_Basic):
                             self.args.adj_every = 0
                             self.logging.add_figure('graph/distance', fig, epoch)
                             start_draw = False
-                        elif self.args.graph_type == 'correlation' and (epoch + 1) % self.args.adj_every == 0:
+                        elif self.args.graph_type == 'correlation' and (epoch % self.args.adj_every == 0):
                             pos_spec = get_spectral_graph_positions(self.args.marker_dir)
                             fig = draw_graph_weighted_edge(adj_mat, NODE_ID_DICT, pos_spec, title=f'correlation_epoch{epoch}.png', 
                                                      is_directed=self.args.directed, plot_colorbar=True, font_size=30, 
@@ -152,58 +175,70 @@ class Exp_Anomaly_Detection(Exp_Basic):
                             self.logging.add_figure(f'graph/correlation_{epoch}', fig, epoch)
                             start_draw = False
 
-                    seq_pred = self.model(x, y_true, supports, self.steps)
-                    loss = criterion(y_true, seq_pred).to(self.device)
+                    seq_pred = self.model(x, y, supports, self.steps)
 
+                    loss = self.criterion(y, seq_pred).to(self.device)
                     loss_val = loss.item()
                     loss.backward()
 
                     nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=self.args.max_norm)
-                    self.steps += batch_size
+                    self.steps += batch_size * self.world_size
                     model_optim.step()
                     
-                    progress_bar.update(batch_size)
+                    progress_bar.update(batch_size * self.world_size)
                     progress_bar.set_postfix(loss=loss_val, lr=model_optim.param_groups[0]['lr'])
 
                     self.logging.add_scalar('train/loss', loss_val, self.steps)
                     self.logging.add_scalar('train/lr', model_optim.param_groups[0]['lr'], self.steps)
 
-                    saver.save(epoch, self.model, model_optim, loss_val)
+            saver.save(epoch, self.model, model_optim, loss_val)
 
-                    if (i+1) % self.args.eval_every == 0:
-                        vali_loss = self.vali(vali_loader, criterion)
-                        early_stopping(vali_loss, self.model, path)
-                        if early_stopping.early_stop:
-                            print("Early stopping")
-                            break
-                scheduler.step()
-
+            if (i+1) % self.args.eval_every == 0:
+                vali_loss = self.vali(vali_loader, self.criterion)
+                early_stopping(vali_loss, self.model, path)
+                if early_stopping.early_stop:
+                    break
+            scheduler.step()
         return
 
     def test(self, model_file:str='best.pth.tar'):
-        _, test_loader = self._get_data(flag='eval', scalar=self.scalar)
-        print('loading model')
-        path = os.path.join(self.args.log_dir, self.args.model, self.args.task_name, model_file)
-        load_model_checkpoint(path, self.model)
+        _, test_loader = self._get_data(flag='eval')
+        path = os.path.join(self.args.log_dir, self.args.model, self.args.task_name, 'checkpoint', model_file)
+        load_model_checkpoint(path, self.model, map_location=self.device)
 
         criterion = self._select_criterion()
 
         self.model.eval()
-        loss = []
+        losses = []
         with torch.no_grad():
-            for i, (x, y_true, _, supports) in tqdm(enumerate(test_loader)):
+            for x, y in tqdm(test_loader, disable=(self.device != 0)):
                 x = x.float().to(self.device)
-                y_true = y_true.float().to(self.device)
+                y = y.float().to(self.device)
+
+                batch_size, node_num, seq_len = x.shape
+                x = x.reshape(batch_size, node_num, -1, self.args.freq)
+                x = x.permute(0, 2, 1, 3)
+
+                y = y.reshape(batch_size, node_num, -1, self.args.freq)
+                y = y.permute(0, 2, 1, 3)
+                if self.args.use_fft:
+                    x = torch.fft.rfft(x)[..., :self.args.freq//2]
+                    x = torch.log(torch.abs(x) + 1e-8)
+                    y = torch.fft.rfft(y)[..., :self.args.freq//2]
+                    y = torch.log(torch.abs(y) + 1e-8)
+
+                # get adjmat, supports
                 if self.args.use_graph:
-                    for i in range(len(supports)):
-                        supports[i] = supports[i].to(self.device)
+                    _, supports = get_supports(self.args, x)
+                else:
+                    supports = None
 
-                y_pred = self.model(x, y_true, supports, None)
+                y_pred = self.model(x, y, supports, None)
 
-                loss = criterion(y_true, y_pred).to(self.device)
+                loss = criterion(y, y_pred).cpu()
                 loss_val = loss.item()
-                loss.append(loss_val)
+                losses.append(loss_val)
 
-            loss = np.average(loss)
-        self.logging.add_scalar('test/loss', loss, self.steps)
+            loss = np.average(losses)
+        self.logging.add_scalar('test/loss', loss)
         return

@@ -68,7 +68,7 @@ class Exp_SSL(Exp_Basic):
         return scheduler
 
     def vali(self, vali_loader, criterion):
-        total_loss = []
+        losses = []
         self.model.eval()
         with torch.no_grad():
             for x, y in tqdm(vali_loader, disable=(self.device != 0)):
@@ -97,27 +97,26 @@ class Exp_SSL(Exp_Basic):
 
                 y_pred = y_pred.detach()
                 loss = criterion(y, y_pred).cpu()
-                total_loss.append(loss.item())
+                loss_val = loss.item()
+                losses.append(loss_val)
 
-        total_loss = np.average(total_loss)
-        self.logging.add_scalar('vali/loss', total_loss, self.steps)
+        loss = np.average(losses)
 
         self.model.train()
-        return total_loss
+        return loss
 
     def train(self):
         _, train_loader = self._get_data(flag='train')
         _, vali_loader = self._get_data(flag='dev')
 
-        path = os.path.join(self.args.log_dir, self.args.model, self.args.task_name)
-        os.makedirs(path, exist_ok=True)
+        path = self.logging_dir
         checkpoint_dir = os.path.join(path, 'checkpoint')
         os.makedirs(checkpoint_dir, exist_ok=True)
-        os.makedirs(os.path.join(self.args.log_dir, self.args.model, self.args.task_name, 'graph'), exist_ok=True)
+        os.makedirs(os.path.join(self.logging_dir, 'graph'), exist_ok=True)
 
-        args_file = os.path.join(self.args.log_dir, self.args.model, self.args.task_name, 'args.json')
-        with open(args_file, 'w') as f:
-            if self.device == 0:
+        args_file = os.path.join(self.logging_dir, 'args.json')
+        if self.device == 0:
+            with open(args_file, 'w') as f:
                 json.dump(vars(self.args), f, indent=4, sort_keys=True)
 
         early_stopping = EarlyStopping(patience=self.args.patience, verbose=True)
@@ -126,9 +125,9 @@ class Exp_SSL(Exp_Basic):
         saver = CheckpointSaver(checkpoint_dir, metric_name=self.args.loss_fn,
                                   maximize_metric=False)
 
+        self.steps = 0
         for epoch in range(self.args.num_epochs): 
             start_draw = True
-            self.steps = 0
             self.model.train()
 
             with tqdm(train_loader.dataset, desc=f'Epoch: {epoch + 1} / {self.args.num_epochs}', \
@@ -163,7 +162,7 @@ class Exp_SSL(Exp_Basic):
                             pos_spec = get_spectral_graph_positions(self.args.marker_dir)
                             fig = draw_graph_weighted_edge(adj_mat, NODE_ID_DICT, pos_spec, title=f'distance_epoch{epoch}.png', 
                                                      is_directed=False, plot_colorbar=True, font_size=30,
-                                                     save_dir=os.path.join(self.args.log_dir, self.args.model, self.args.task_name, 'graph'))
+                                                     save_dir=os.path.join(self.logging_dir, 'graph'))
                             self.args.adj_every = 0
                             self.logging.add_figure('graph/distance', fig, epoch)
                             start_draw = False
@@ -171,7 +170,7 @@ class Exp_SSL(Exp_Basic):
                             pos_spec = get_spectral_graph_positions(self.args.marker_dir)
                             fig = draw_graph_weighted_edge(adj_mat, NODE_ID_DICT, pos_spec, title=f'correlation_epoch{epoch}.png', 
                                                      is_directed=self.args.directed, plot_colorbar=True, font_size=30, 
-                                                     save_dir=os.path.join(self.args.log_dir, self.args.model, self.args.task_name, 'graph'))
+                                                     save_dir=os.path.join(self.logging_dir, 'graph'))
                             self.logging.add_figure(f'graph/correlation_{epoch}', fig, epoch)
                             start_draw = False
 
@@ -195,7 +194,8 @@ class Exp_SSL(Exp_Basic):
 
             if (i+1) % self.args.eval_every == 0:
                 vali_loss = self.vali(vali_loader, self.criterion)
-                early_stopping(vali_loss, self.model, path)
+                self.logging.add_scalar('vali/loss', vali_loss, epoch)
+                early_stopping(vali_loss)
                 if early_stopping.early_stop:
                     break
             scheduler.step()

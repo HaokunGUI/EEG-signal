@@ -3,6 +3,7 @@ import torch
 from models import TimesNet, DCRNN
 from tensorboardX import SummaryWriter
 from utils.tools import WriterFilter
+import datetime
 
 
 class Exp_Basic(object):
@@ -16,9 +17,11 @@ class Exp_Basic(object):
         self.model = self._build_model()
         self.scalar = self._get_scalar()
         self.world_size = int(os.environ["WORLD_SIZE"])
-        logging_dir = os.path.join(self.args.log_dir, self.args.model, self.args.task_name, 'log')
-        os.makedirs(logging_dir, exist_ok=True)
-        self.logging = WriterFilter(SummaryWriter(logging_dir))
+        suffix = datetime.datetime.now().strftime("%y%m%d_%H%M%S")
+        self.logging_dir = os.path.join(self.args.log_dir, self.args.task_name, f'{self.args.model}_{suffix}')
+        log_dir = os.path.join(self.logging_dir, 'log')
+        os.makedirs(log_dir, exist_ok=True)
+        self.logging = WriterFilter(SummaryWriter(log_dir))
         self.criterion = self._select_criterion()
 
     def _select_criterion(self):
