@@ -8,9 +8,6 @@ import os
 import torch.sparse as sparse
 
 def get_supports(args:argparse.Namespace, input: torch.Tensor):
-    if len(input.shape) == 4:
-        bs, sl, num, lens = input.shape
-        input = input.permute(0, 2, 1, 3).reshape(bs, num, -1)
     batchsize, num_node, _ = input.shape
     
     if args.graph_type == 'distance':

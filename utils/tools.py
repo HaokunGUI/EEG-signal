@@ -9,7 +9,7 @@ from torch.distributed import init_process_group, destroy_process_group
 plt.switch_backend('agg')
 
 class EarlyStopping:
-    def __init__(self, patience=3, verbose=False, delta=0):
+    def __init__(self, patience=3, verbose=False, delta=0, if_max=False):
         self.patience = patience
         self.verbose = verbose
         self.counter = 0
@@ -17,9 +17,13 @@ class EarlyStopping:
         self.early_stop = False
         self.val_loss_min = np.Inf
         self.delta = delta
+        self.if_max = if_max
 
     def __call__(self, val_loss):
-        score = -val_loss
+        if self.if_max:
+            score = val_loss
+        else:
+            score = -val_loss
         if self.best_score is None:
             self.best_score = score
         elif score < self.best_score + self.delta:

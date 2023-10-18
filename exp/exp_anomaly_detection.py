@@ -19,12 +19,15 @@ from torch.optim.lr_scheduler import CosineAnnealingLR
 from utils.constants import *
 from torch.nn.parallel import DistributedDataParallel as DDP
 import os
+import torch.distributed as dist
+from torchmetrics.classification import BinaryAccuracy, BinaryAUROC, BinaryPrecisionRecallCurve
 
 warnings.filterwarnings('ignore')
 
 class Exp_Anomaly_Detection(Exp_Basic):
     def __init__(self, args:argparse.Namespace):
         super(Exp_Anomaly_Detection, self).__init__(args)
+        self.auroc = BinaryAUROC().to(self.device)
 
     def _build_model(self):
         # model init
@@ -69,13 +72,25 @@ class Exp_Anomaly_Detection(Exp_Basic):
         scheduler = CosineAnnealingLR(optimizer, T_max=self.args.num_epochs)
         return scheduler
 
-    def vali(self, vali_loader, criterion):
+    def vali(self):
+        _, vali_loader = self._get_data(flag='dev')
+        criterion = self._select_criterion()
+
         losses = []
+        y_preds = []
+        y_trues = []
         self.model.eval()
+
         with torch.no_grad():
-            for x, y in tqdm(vali_loader, disable=(self.device != 0)):
+            for x, y, _ in tqdm(vali_loader, disable=(self.device != 0)):
                 x = x.float().to(self.device)
                 y = y.to(self.device)
+
+                # get adjmat, supports
+                if self.args.use_graph:
+                    _, supports = get_supports(self.args, x)
+                else:
+                    supports = None
 
                 if self.args.using_patch:
                     batch_size, node_num, seq_len = x.shape
@@ -85,12 +100,6 @@ class Exp_Anomaly_Detection(Exp_Basic):
                 if self.args.use_fft:
                     x = torch.fft.rfft(x)[..., :self.args.input_dim]
                     x = torch.log(torch.abs(x) + 1e-8)
-
-                # get adjmat, supports
-                if self.args.use_graph:
-                    _, supports = get_supports(self.args, x)
-                else:
-                    supports = None
 
                 if self.args.model == 'DCRNN':
                     seq_len = torch.ones(x.shape[0], dtype=torch.int64).cuda() * self.args.input_len
@@ -103,14 +112,23 @@ class Exp_Anomaly_Detection(Exp_Basic):
                 loss_val = loss.item()
                 losses.append(loss_val)
 
+                y_preds.append(y_pred)
+                y_trues.append(y)
+
         loss = np.average(losses)
+        y_pred = torch.cat(y_preds, dim=0)
+        y_true = torch.cat(y_trues, dim=0)
+        
+        acc_metric = BinaryAccuracy().cuda()
+        acc = acc_metric(torch.sigmoid(y_pred), y_true).cpu().item()
+        auroc = self.auroc(torch.sigmoid(y_pred), y_true).cpu().item()
+        metrics = {'loss': loss, 'acc': acc, 'auroc': auroc}
 
         self.model.train()
-        return loss
+        return metrics
 
     def train(self):
         _, train_loader = self._get_data(flag='train')
-        _, vali_loader = self._get_data(flag='dev')
 
         path = self.logging_dir
         checkpoint_dir = os.path.join(path, 'checkpoint')
@@ -122,11 +140,11 @@ class Exp_Anomaly_Detection(Exp_Basic):
             with open(args_file, 'w') as f:
                 json.dump(vars(self.args), f, indent=4, sort_keys=True)
 
-        early_stopping = EarlyStopping(patience=self.args.patience, verbose=True)
+        early_stopping = EarlyStopping(patience=self.args.patience, verbose=True, if_max=True)
         model_optim = self._select_optimizer()
         scheduler = self._select_scheduler(model_optim)
-        saver = CheckpointSaver(checkpoint_dir, metric_name='BCELoss',
-                                  maximize_metric=False)
+        saver = CheckpointSaver(checkpoint_dir, metric_name='AUROC',
+                                  maximize_metric=True)
 
         self.steps = 0
         for epoch in range(self.args.num_epochs): 
@@ -135,7 +153,7 @@ class Exp_Anomaly_Detection(Exp_Basic):
 
             with tqdm(train_loader.dataset, desc=f'Epoch: {epoch + 1} / {self.args.num_epochs}', \
                                               disable=(self.device != 0)) as progress_bar:
-                for x, y in train_loader:
+                for x, y, augment in train_loader:
                     model_optim.zero_grad()
 
                     batch_size = x.size(0)
@@ -143,6 +161,13 @@ class Exp_Anomaly_Detection(Exp_Basic):
                     y = y.to(self.device)
 
                     with torch.no_grad():
+                        # get adjmat, supports
+                        if self.args.use_graph:
+                            x_origin = getOriginalData(x, augment)
+                            adj_mat, supports = get_supports(self.args, x_origin)
+                        else:
+                            supports = None
+
                         if self.args.using_patch:
                             batch_size, node_num, seq_len = x.shape
                             x = x.reshape(batch_size, node_num, -1, self.args.freq)
@@ -151,12 +176,6 @@ class Exp_Anomaly_Detection(Exp_Basic):
                         if self.args.use_fft:
                             x = torch.fft.rfft(x)[..., :self.args.input_dim]
                             x = torch.log(torch.abs(x) + 1e-8)
-
-                        # get adjmat, supports
-                        if self.args.use_graph:
-                            adj_mat, supports = get_supports(self.args, x)
-                        else:
-                            supports = None
 
                         if self.args.use_graph and start_draw:
                             if self.args.graph_type == 'distance' and self.args.adj_every > 0:
@@ -183,6 +202,8 @@ class Exp_Anomaly_Detection(Exp_Basic):
 
                     loss = self.criterion(y_pred, y).to(self.device)
                     loss_val = loss.item()
+                    acc_metric = BinaryAccuracy().cuda()
+                    acc = acc_metric(torch.sigmoid(y_pred), y).item()
                     loss.backward()
 
                     nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=self.args.max_norm)
@@ -190,17 +211,19 @@ class Exp_Anomaly_Detection(Exp_Basic):
                     model_optim.step()
                     
                     progress_bar.update(batch_size * self.world_size)
-                    progress_bar.set_postfix(loss=loss_val, lr=model_optim.param_groups[0]['lr'])
+                    progress_bar.set_postfix(loss=loss_val, acc=acc)
 
                     self.logging.add_scalar('train/loss', loss_val, self.steps)
                     self.logging.add_scalar('train/lr', model_optim.param_groups[0]['lr'], self.steps)
-
-            saver.save(epoch, self.model, model_optim, loss_val)
+                    self.logging.add_scalar('train/acc', acc, self.steps)
 
             if (epoch+1) % self.args.eval_every == 0:
-                vali_loss = self.vali(vali_loader, self.criterion)
-                self.logging.add_scalar('vali/loss', vali_loss, epoch)
-                early_stopping(vali_loss)
+                vali_metrics = self.vali()
+                self.logging.add_scalar('vali/loss', vali_metrics['loss'], epoch)
+                self.logging.add_scalar('vali/acc', vali_metrics['acc'], epoch)
+                self.logging.add_scalar('vali/recall', vali_metrics['auroc'], epoch)
+                saver.save(epoch, self.model, model_optim, vali_metrics['auroc'])
+                early_stopping(vali_metrics['auroc'])
                 if early_stopping.early_stop:
                     break
             scheduler.step()
@@ -212,13 +235,22 @@ class Exp_Anomaly_Detection(Exp_Basic):
         load_model_checkpoint(path, self.model, map_location=self.device)
 
         criterion = self._select_criterion()
+        threshold = self._cal_best_threshold()
 
         self.model.eval()
         losses = []
+        y_trues = []
+        y_preds = []
         with torch.no_grad():
-            for x, y in tqdm(test_loader, disable=(self.device != 0)):
+            for x, y, _ in tqdm(test_loader, disable=(self.device != 0)):
                 x = x.float().to(self.device)
                 y = y.float().to(self.device)
+
+                # get adjmat, supports
+                if self.args.use_graph:
+                    _, supports = get_supports(self.args, x)
+                else:
+                    supports = None
 
                 if self.args.using_patch:
                     batch_size, node_num, seq_len = x.shape
@@ -228,12 +260,6 @@ class Exp_Anomaly_Detection(Exp_Basic):
                 if self.args.use_fft:
                     x = torch.fft.rfft(x)[..., :self.args.input_dim]
                     x = torch.log(torch.abs(x) + 1e-8)
-
-                # get adjmat, supports
-                if self.args.use_graph:
-                    _, supports = get_supports(self.args, x)
-                else:
-                    supports = None
 
                 if self.args.model == 'DCRNN':
                     seq_len = torch.ones(x.shape[0], dtype=torch.int64).cuda() * self.args.input_len
@@ -245,6 +271,78 @@ class Exp_Anomaly_Detection(Exp_Basic):
                 loss_val = loss.item()
                 losses.append(loss_val)
 
+                y_preds.append(y_pred)
+                y_trues.append(y)
+
             loss = np.average(losses)
+
+            y_pred = torch.cat(y_preds, dim=0)
+            y_true = torch.cat(y_trues, dim=0)
+            acc_metric = BinaryAccuracy(threshold=threshold).cuda()
+            acc = acc_metric(torch.sigmoid(y_pred), y_true).cpu().item()
+            auroc = self.auroc(torch.sigmoid(y_pred), y_true).cpu().item()
+
         self.logging.add_scalar('test/loss', loss)
+        self.logging.add_scalar('test/acc', acc)
+        self.logging.add_scalar('test/auroc', auroc)
         return
+    
+    def _cal_best_threshold(self,):
+        _, vali_loader = self._get_data(flag='dev')
+        path = os.path.join(self.logging_dir, 'checkpoint', 'best.pth.tar')
+        load_model_checkpoint(path, self.model, map_location=self.device)
+
+        self.model.eval()
+        y_trues = []
+        y_preds = []
+        with torch.no_grad():
+            for x, y, _ in tqdm(vali_loader, disable=(self.device != 0)):
+                x = x.float().to(self.device)
+                y = y.float().to(self.device)
+
+                # get adjmat, supports
+                if self.args.use_graph:
+                    _, supports = get_supports(self.args, x)
+                else:
+                    supports = None
+
+                if self.args.using_patch:
+                    batch_size, node_num, seq_len = x.shape
+                    x = x.reshape(batch_size, node_num, -1, self.args.freq)
+                    x = x.permute(0, 2, 1, 3)
+
+                if self.args.use_fft:
+                    x = torch.fft.rfft(x)[..., :self.args.input_dim]
+                    x = torch.log(torch.abs(x) + 1e-8)
+
+                if self.args.model == 'DCRNN':
+                    seq_len = torch.ones(x.shape[0], dtype=torch.int64).cuda() * self.args.input_len
+                    y_pred = self.model(x, seq_len, supports)
+                else:
+                    pass
+
+                y_preds.append(y_pred)
+                y_trues.append(y)
+
+            y_pred = torch.cat(y_preds, dim=0)
+            y_true = torch.cat(y_trues, dim=0)
+            metric = BinaryPrecisionRecallCurve().cuda()
+            precision, recall, thresholds = metric(torch.sigmoid(y_pred), y_true)
+            thresh_filt = []
+            fscore = []
+            n_thresh = len(thresholds)
+            for idx in range(n_thresh):
+                curr_f1 = (2 * precision[idx] * recall[idx]) / \
+                    (precision[idx] + recall[idx])
+                if not (np.isnan(curr_f1)):
+                    fscore.append(curr_f1)
+                    thresh_filt.append(thresholds[idx])
+            # locate the index of the largest f score
+            ix = np.argmax(np.array(fscore))
+            best_thresh = thresh_filt[ix]
+        if self.device == 0:
+            path = os.path(self.logging_dir, 'best_threshold.txt')
+            with open(path, 'w') as f:
+                f.write(str(best_thresh))
+        dist.barrier()
+        return best_thresh

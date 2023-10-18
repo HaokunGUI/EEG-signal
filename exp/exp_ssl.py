@@ -71,9 +71,15 @@ class Exp_SSL(Exp_Basic):
         losses = []
         self.model.eval()
         with torch.no_grad():
-            for x, y in tqdm(vali_loader, disable=(self.device != 0)):
+            for x, y, _ in tqdm(vali_loader, disable=(self.device != 0)):
                 x = x.float().to(self.device)
                 y = y.float().to(self.device)
+
+                # get adjmat, supports
+                if self.args.use_graph:
+                    _, supports = get_supports(self.args, x)
+                else:
+                    supports = None
 
                 if self.args.using_patch:
                     batch_size, node_num, seq_len = x.shape
@@ -88,12 +94,6 @@ class Exp_SSL(Exp_Basic):
                     x = torch.log(torch.abs(x) + 1e-8)
                     y = torch.fft.rfft(y)[..., :self.args.output_dim]
                     y = torch.log(torch.abs(y) + 1e-8)
-
-                # get adjmat, supports
-                if self.args.use_graph:
-                    _, supports = get_supports(self.args, x)
-                else:
-                    supports = None
 
                 y_pred = self.model(x, y, supports, None)
 
@@ -134,14 +134,22 @@ class Exp_SSL(Exp_Basic):
 
             with tqdm(train_loader.dataset, desc=f'Epoch: {epoch + 1} / {self.args.num_epochs}', \
                                               disable=(self.device != 0)) as progress_bar:
-                for x, y in train_loader:
+                for x, y, augment in train_loader:
                     model_optim.zero_grad()
 
                     batch_size = x.size(0)
                     x = x.float().to(self.device)
                     y = y.float().to(self.device)
+                    augment = augment.to(self.device)
 
                     with torch.no_grad():
+                        # get adjmat, supports
+                        if self.args.use_graph:
+                            x_origin = getOriginalData(x, augment)
+                            adj_mat, supports = get_supports(self.args, x_origin)
+                        else:
+                            supports = None
+
                         if self.args.using_patch:
                             batch_size, node_num, seq_len = x.shape
                             x = x.reshape(batch_size, node_num, -1, self.args.freq)
@@ -155,11 +163,6 @@ class Exp_SSL(Exp_Basic):
                             x = torch.log(torch.abs(x) + 1e-8)
                             y = torch.fft.rfft(y)[..., :self.args.output_dim]
                             y = torch.log(torch.abs(y) + 1e-8)
-                        # get adjmat, supports
-                        if self.args.use_graph:
-                            adj_mat, supports = get_supports(self.args, x)
-                        else:
-                            supports = None
 
                         if self.args.use_graph and start_draw:
                             if self.args.graph_type == 'distance' and self.args.adj_every > 0:
@@ -218,9 +221,15 @@ class Exp_SSL(Exp_Basic):
         self.model.eval()
         losses = []
         with torch.no_grad():
-            for x, y in tqdm(test_loader, disable=(self.device != 0)):
+            for x, y, _ in tqdm(test_loader, disable=(self.device != 0)):
                 x = x.float().to(self.device)
                 y = y.float().to(self.device)
+
+                # get adjmat, supports
+                if self.args.use_graph:
+                    _, supports = get_supports(self.args, x)
+                else:
+                    supports = None
 
                 if self.args.using_patch:
                     batch_size, node_num, seq_len = x.shape
@@ -235,12 +244,6 @@ class Exp_SSL(Exp_Basic):
                     x = torch.log(torch.abs(x) + 1e-8)
                     y = torch.fft.rfft(y)[..., :self.args.output_dim]
                     y = torch.log(torch.abs(y) + 1e-8)
-
-                # get adjmat, supports
-                if self.args.use_graph:
-                    _, supports = get_supports(self.args, x)
-                else:
-                    supports = None
 
                 y_pred = self.model(x, y, supports, None)
 

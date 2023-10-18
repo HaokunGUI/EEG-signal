@@ -6,6 +6,8 @@ from typing import Any, Tuple
 import h5py
 import torch
 import numpy as np
+from utils.constants import INCLUDED_CHANNELS
+from utils.utils import get_swap_pairs
 
 warnings.filterwarnings('ignore')
 
@@ -70,8 +72,16 @@ class Dataset_TUSZ(Dataset):
             x, y = self._getIdx2Slice(file_name_tuple)
 
             if self.data_augment:
-                # TODO
-                pass
+                # reflect or not reflect for both x and y
+                reflect = np.random.choice([True, False])
+                x = self._random_reflect(x, reflect=reflect)
+                y = self._random_reflect(y, reflect=reflect)
+            
+                # scale by the same factor for both x and y            
+                scale_factor = np.random.uniform(0.8, 1.2)
+                x = self._random_scale(x, scale_factor=scale_factor)
+                y = self._random_scale(y, scale_factor=scale_factor)
+
             if self.scalar is not None:
                 x = self.scalar.transform(x)
                 y = self.scalar.transform(y)
@@ -83,8 +93,14 @@ class Dataset_TUSZ(Dataset):
             file_name, label = self.file_tuples[index]
             x = self._getSlice(file_name)
             if self.data_augment:
-                # TODO
-                pass
+                # reflect or not reflect for both x and y
+                reflect = np.random.choice([True, False])
+                x = self._random_reflect(x, reflect=reflect)
+            
+                # scale by the same factor for both x and y            
+                scale_factor = np.random.uniform(0.8, 1.2)
+                x = self._random_scale(x, scale_factor=scale_factor)
+
             if self.scalar is not None:
                 x = self.scalar.transform(x)
             # convert to Tensor
@@ -97,7 +113,7 @@ class Dataset_TUSZ(Dataset):
         else:
             raise NotImplementedError
         
-        return x, y
+        return x, y, int(self.data_augment and reflect)
     
 
     def __len__(self) -> int: 
@@ -139,3 +155,23 @@ class Dataset_TUSZ(Dataset):
         start_window = input_node_num * slice_num
         end_window = start_window + input_node_num
         return signals[:, start_window:end_window]
+
+    def _random_reflect(self, EEG_seq, reflect=False):
+        """
+        Randomly reflect EEG channels along the midline
+        """
+        swap_pairs = get_swap_pairs(INCLUDED_CHANNELS)
+        EEG_seq_reflect = EEG_seq.copy()
+        if reflect:            
+            for pair in swap_pairs:
+                EEG_seq_reflect[[pair[0],pair[1]],:] = EEG_seq[[pair[1], pair[0]],:]
+        return EEG_seq_reflect
+
+    def _random_scale(self, EEG_seq, scale_factor=None):
+        """
+        Scale EEG signals by a random number between 0.8 and 1.2
+        """
+        if scale_factor is None:
+            scale_factor = np.random.uniform(0.8, 1.2)
+        EEG_seq *= scale_factor
+        return EEG_seq

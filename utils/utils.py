@@ -2,6 +2,7 @@ import torch
 import os
 import shutil
 import queue
+from utils.constants import INCLUDED_CHANNELS
 
 class CheckpointSaver:
     """Class to save and load model checkpoints.
@@ -98,3 +99,41 @@ def last_relevant_pytorch(output, lengths, batch_first=True):
     last_output = output.gather(time_dimension, masks).squeeze(time_dimension).cuda()
 
     return last_output
+
+def get_swap_pairs(channels):
+    """
+    Swap select adjacenet channels
+    Args:
+        channels: list of channel names
+    Returns:
+        list of tuples, each a pair of channel indices being swapped
+    """
+    swap_pairs = []
+    if ("EEG FP1" in channels) and ("EEG FP2" in channels):
+        swap_pairs.append([channels.index("EEG FP1"), channels.index("EEG FP2")])
+    if ("EEG Fp1" in channels) and ("EEG Fp2" in channels):
+        swap_pairs.append([channels.index("EEG Fp1"), channels.index("EEG Fp2")])
+    if ("EEG F3" in channels) and ("EEG F4" in channels):
+        swap_pairs.append([channels.index("EEG F3"), channels.index("EEG F4")])
+    if ("EEG F7" in channels) and ("EEG F8" in channels):
+        swap_pairs.append([channels.index("EEG F7"), channels.index("EEG F8")])
+    if ("EEG C3" in channels) and ("EEG C4" in channels):
+        swap_pairs.append([channels.index("EEG C3"), channels.index("EEG C4")])
+    if ("EEG T3" in channels) and ("EEG T4" in channels):
+        swap_pairs.append([channels.index("EEG T3"), channels.index("EEG T4")])
+    if ("EEG T5" in channels) and ("EEG T6" in channels):
+        swap_pairs.append([channels.index("EEG T5"), channels.index("EEG T6")])
+    if ("EEG O1" in channels) and ("EEG O2" in channels):
+        swap_pairs.append([channels.index("EEG O1"), channels.index("EEG O2")])
+
+    return swap_pairs
+
+def getOriginalData(x:torch.Tensor, isAug:torch.Tensor):
+    x_new = x.clone().cuda()
+    change_channels = torch.Tensor(get_swap_pairs(INCLUDED_CHANNELS)).int()
+    channel_1 = change_channels[:, 0]
+    channel_2 = change_channels[:, 1]
+    x_new[:, channel_1, :] = x[:, channel_2, :]
+    x_new[:, channel_2, :] = x[:, channel_1, :]
+    isAug = isAug.clone().reshape(-1, 1, 1).cuda()
+    return x_new * isAug + x * (1 - isAug)

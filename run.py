@@ -7,6 +7,8 @@ import torch.multiprocessing
 from utils.tools import ddp_setup, ddp_cleanup
 import os
 
+os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2,3"
+
 def main(args: argparse.Namespace):
     if args.use_gpu:
         ddp_setup()
@@ -53,9 +55,9 @@ if __name__ == '__main__':
     parser.add_argument('--marker_dir', type=str, default='/home/guihaokun/Time-Series-Pretrain/data', help='marker dir')
     parser.add_argument('--data_augment', action='store_true', help='use data augment or not', default=False)
     parser.add_argument('--normalize', action='store_true', help='normalize data or not', default=False)
-    parser.add_argument('--train_batch_size', type=int, default=64, help='batch size of train input data')
-    parser.add_argument('--test_batch_size', type=int, default=128, help='batch size of test input data')
-    parser.add_argument('--num_workers', type=int, default=16, help='data loader num workers')
+    parser.add_argument('--train_batch_size', type=int, default=128, help='batch size of train input data')
+    parser.add_argument('--test_batch_size', type=int, default=256, help='batch size of test input data')
+    parser.add_argument('--num_workers', type=int, default=20, help='data loader num workers')
     parser.add_argument('--freq', type=int, default=250, help='sample frequency')
 
     # ssl task
@@ -63,7 +65,7 @@ if __name__ == '__main__':
     parser.add_argument('--output_len', type=int, default=12, help='prediction sequence length')
     parser.add_argument('--time_step_len', type=int, default=1, help='time step length')
     parser.add_argument('--use_fft', action='store_true', help='use fft or not', default=False)
-    parser.add_argument('--loss_fn', type=str, default='mse', help='loss function, options:[mse, mae]')
+    parser.add_argument('--loss_fn', type=str, default='mae', help='loss function, options:[mse, mae]')
 
     # detection task
     parser.add_argument('--scale_ratio', type=float, default=1.0, help='scale ratio of train data')
@@ -91,17 +93,16 @@ if __name__ == '__main__':
 
     # optimization
     parser.add_argument('--num_epochs', type=int, default=60, help='train epochs')
-    parser.add_argument('--patience', type=int, default=3, help='early stopping patience')
-    parser.add_argument('--learning_rate', type=float, default=1e-3, help='optimizer learning rate')
+    parser.add_argument('--patience', type=int, default=5, help='early stopping patience')
+    parser.add_argument('--learning_rate', type=float, default=5e-4, help='optimizer learning rate')
     parser.add_argument('--weight_decay', type=float, default=0.0, help='optimizer weight decay')
-    parser.add_argument('--max_norm', type=float, default=1.0, help='max norm of grad')
+    parser.add_argument('--max_norm', type=float, default=5.0, help='max norm of grad')
 
     # GPU
     parser.add_argument('--use_gpu', type=bool, default=True, help='use gpu')
-    parser.add_argument('--devices', type=str, default='0,1,2,3', help='device ids of multile gpus')
 
     # log setting
-    parser.add_argument('--eval_every', type=int, default=5, help='evaluate every X epochs')
+    parser.add_argument('--eval_every', type=int, default=1, help='evaluate every X epochs')
     parser.add_argument('--adj_every', type=int, default=10, help='display adj matrix every X epochs')
 
     # pretrain
@@ -113,11 +114,7 @@ if __name__ == '__main__':
     args.use_gpu = True if torch.cuda.is_available() and args.use_gpu else False
 
     if args.use_gpu:
-        args.devices = args.devices.replace(' ', '')
-        device_ids = args.devices.split(',')
-        args.device_ids = [int(id_) for id_ in device_ids]
-        args.gpu = args.device_ids[0]
-        os.environ["CUDA_VISIBLE_DEVICES"] = args.devices
+        args.gpu = 0
     
     if args.model in ['DCRNN']:
         args.use_graph = True
