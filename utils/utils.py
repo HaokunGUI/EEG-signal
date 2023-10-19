@@ -3,6 +3,7 @@ import os
 import shutil
 import queue
 from utils.constants import INCLUDED_CHANNELS
+import json
 
 class CheckpointSaver:
     """Class to save and load model checkpoints.
@@ -27,8 +28,6 @@ class CheckpointSaver:
         self.best_val = None
         self.ckpt_paths = queue.PriorityQueue()
         self.fn = fn
-        self._print('Saver will {}imize {}...'
-                    .format('max' if maximize_metric else 'min', metric_name))
 
     def is_best(self, metric_val):
         """Check whether `metric_val` is the best seen so far.
@@ -50,7 +49,7 @@ class CheckpointSaver:
         """Print a message if logging is enabled."""
         pass
 
-    def save(self, epoch, model, optimizer, metric_val):
+    def save(self, epoch, model, optimizer, metric_val, param_dict=None):
         """Save model parameters to disk.
         Args:
             epoch (int): Current epoch.
@@ -60,7 +59,6 @@ class CheckpointSaver:
         """
         if not self.fn():
             return
-        
         ckpt_dict = {
             'epoch': epoch,
             'model_state': model.state_dict(),
@@ -76,7 +74,10 @@ class CheckpointSaver:
             self.best_val = metric_val
             best_path = os.path.join(self.save_dir, 'best.pth.tar')
             shutil.copy(checkpoint_path, best_path)
-            self._print('New best checkpoint at epoch {}...'.format(epoch))
+            if param_dict is not None:
+                with open(os.path.join(self.save_dir, 'params.json'), 'w') as f:
+                    json.dump(param_dict, f, indent=4, sort_keys=True)
+
 
 
 def load_model_checkpoint(checkpoint_file, model, optimizer=None, map_location=None):

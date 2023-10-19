@@ -9,7 +9,7 @@ from torch.distributed import init_process_group, destroy_process_group
 plt.switch_backend('agg')
 
 class EarlyStopping:
-    def __init__(self, patience=3, verbose=False, delta=0, if_max=False):
+    def __init__(self, patience=3, verbose=False, delta=0, if_max=False, device=None):
         self.patience = patience
         self.verbose = verbose
         self.counter = 0
@@ -18,8 +18,13 @@ class EarlyStopping:
         self.val_loss_min = np.Inf
         self.delta = delta
         self.if_max = if_max
+        self.device = device
 
     def __call__(self, val_loss):
+        if self.device is not None and self.device != 0:
+            return
+        if self.patience == 0:
+            return
         if self.if_max:
             score = val_loss
         else:
@@ -125,8 +130,8 @@ def resampleData(signals, to_freq=200, window_size=4):
 
 def seed_torch(seed=1029):
 	random.seed(seed)
-	os.environ['PYTHONHASHSEED'] = str(seed) # 为了禁止hash随机化，使得实验可复现
-	# np.random.seed(seed)
+	os.environ['PYTHONHASHSEED'] = str(seed) 
+	np.random.seed(seed)
 	torch.manual_seed(seed)
 	torch.cuda.manual_seed(seed)
 	torch.cuda.manual_seed_all(seed) # if you are using multi-GPU.

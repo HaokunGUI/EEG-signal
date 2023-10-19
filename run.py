@@ -4,12 +4,13 @@ from exp.exp_anomaly_detection import Exp_Anomaly_Detection
 from exp.exp_classification import Exp_Classification
 from exp.exp_ssl import Exp_SSL
 import torch.multiprocessing
-from utils.tools import ddp_setup, ddp_cleanup
+from utils.tools import ddp_setup, ddp_cleanup, seed_torch
 import os
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2,3"
 
 def main(args: argparse.Namespace):
+    seed_torch(args.seed)
     if args.use_gpu:
         ddp_setup()
         rank = int(os.environ['LOCAL_RANK'])
@@ -48,6 +49,7 @@ if __name__ == '__main__':
     parser.add_argument('--model', type=str, required=True, default='DCRNN',
                         help='model name, options: [DCRNN, TimesNet]')
     parser.add_argument('--log_dir', type=str, default='/home/guihaokun/Time-Series-Pretrain/logging', help='log dir')
+    parser.add_argument('--seed', type=int, default=1029, help='random seed')
 
     # data loader
     parser.add_argument('--dataset', type=str, default='TUSZ', help='dataset type, options:[TUSZ]')
@@ -55,8 +57,8 @@ if __name__ == '__main__':
     parser.add_argument('--marker_dir', type=str, default='/home/guihaokun/Time-Series-Pretrain/data', help='marker dir')
     parser.add_argument('--data_augment', action='store_true', help='use data augment or not', default=False)
     parser.add_argument('--normalize', action='store_true', help='normalize data or not', default=False)
-    parser.add_argument('--train_batch_size', type=int, default=128, help='batch size of train input data')
-    parser.add_argument('--test_batch_size', type=int, default=256, help='batch size of test input data')
+    parser.add_argument('--train_batch_size', type=int, default=64, help='batch size of train input data')
+    parser.add_argument('--test_batch_size', type=int, default=128, help='batch size of test input data')
     parser.add_argument('--num_workers', type=int, default=20, help='data loader num workers')
     parser.add_argument('--freq', type=int, default=250, help='sample frequency')
 
@@ -70,6 +72,7 @@ if __name__ == '__main__':
     # detection task
     parser.add_argument('--scale_ratio', type=float, default=1.0, help='scale ratio of train data')
     parser.add_argument('--balanced', action='store_true', help='balanced data or not', default=False)
+    parser.add_argument('--anomaly_ratio', type=float, default=0.1, help='anomaly ratio of train data')
 
     # graph setting
     parser.add_argument('--graph_type', type=str, default='correlation', help='graph type, option:[distance, correlation]')
@@ -88,8 +91,10 @@ if __name__ == '__main__':
     parser.add_argument('--cl_decay_steps', type=int, default=3000, help='Scheduled sampling decay steps.')
     parser.add_argument('--use_curriculum_learning', default=False, action='store_true', help='Whether to use curriculum training for seq-seq model.')
     parser.add_argument('--dropout', type=float, default=0.5, help='Dropout probability.')
-    parser.add_argument('--hidden_dim', type=int, default=1024, help='Hidden state dimension.')
+    parser.add_argument('--d_hidden', type=int, default=8, help='Hidden state dimension.')
     parser.add_argument('--num_kernels', type=int, default=5, help='Number of each kind of kernel.')
+    parser.add_argument('--d_model', type=int, default=16, help='hidden dimension of channels')
+    parser.add_argument('--e_layers', type=int, default=3, help='Number of encoder layers.')
 
     # optimization
     parser.add_argument('--num_epochs', type=int, default=60, help='train epochs')
@@ -136,5 +141,13 @@ if __name__ == '__main__':
     if args.use_fft:
         args.input_dim = args.input_dim // 2
         args.output_dim = args.output_dim // 2
+
+    if args.task_name == 'anomaly_detection':
+        if args.model in ['DCRNN']:
+            args.detection_type = 'classification'
+        elif args.model in ['TimesNet']:
+            args.detection_type = 'restruction'
+        else:
+            args.detection_type = 'None'
     
     main(args)

@@ -21,15 +21,18 @@ def FFT_for_Period(x, k=2):
 class TimesBlock(nn.Module):
     def __init__(self, args):
         super(TimesBlock, self).__init__()
-        self.input_len = args.input_len
-        self.output_len = args.output_len
+        self.input_len = args.input_dim
+        if args.task_name == 'anomaly_detection':
+            self.output_len = 0
+        else:
+            self.output_len = args.output_dim
         self.k = args.top_k
         # parameter-efficient design
         self.conv = nn.Sequential(
-            Inception_Block_V1(args.input_dim, args.hidden_dim,
+            Inception_Block_V1(args.d_model, args.d_hidden,
                                num_kernels=args.num_kernels),
             nn.GELU(),
-            Inception_Block_V1(args.hidden_dim, args.input_dim,
+            Inception_Block_V1(args.d_hidden, args.d_model,
                                num_kernels=args.num_kernels)
         )
 
@@ -72,27 +75,25 @@ class Model(nn.Module):
     Paper link: https://openreview.net/pdf?id=ju_Uqw384Oq
     """
 
-    def __init__(self, configs):
+    def __init__(self, args):
         super(Model, self).__init__()
-        self.configs = configs
-        self.task_name = configs.task_name
-        self.seq_len = configs.seq_len
-        self.label_len = configs.label_len
-        self.pred_len = configs.pred_len
-        self.model = nn.ModuleList([TimesBlock(configs)
-                                    for _ in range(configs.e_layers)])
-        self.enc_embedding = DataEmbedding(configs.enc_in, configs.d_model, configs.embed, configs.freq,
-                                           configs.dropout)
-        self.layer = configs.e_layers
-        self.layer_norm = nn.LayerNorm(configs.d_model)
+        self.args = args
+        self.task_name = args.task_name
+        self.input_len = args.input_dim
+        self.output_len = args.output_dim
+        self.model = nn.ModuleList([TimesBlock(args)
+                                    for _ in range(args.e_layers)])
+        self.enc_embedding = DataEmbedding(args.num_nodes, args.d_model, args.input_dim, args.dropout)
+        self.layer = args.e_layers
+        self.layer_norm = nn.LayerNorm(args.d_model)
         if self.task_name == 'anomaly_detection':
             self.projection = nn.Linear(
-                configs.d_model, configs.c_out, bias=True)
+                args.d_model, args.num_nodes, bias=True)
         if self.task_name == 'classification':
             self.act = F.gelu
-            self.dropout = nn.Dropout(configs.dropout)
+            self.dropout = nn.Dropout(args.dropout)
             self.projection = nn.Linear(
-                configs.d_model * configs.seq_len, configs.num_class)
+                args.d_model * args.input_len, args.num_class)
 
     def anomaly_detection(self, x_enc):
         # Normalization from Non-stationary Transformer
@@ -103,7 +104,7 @@ class Model(nn.Module):
         x_enc /= stdev
 
         # embedding
-        enc_out = self.enc_embedding(x_enc, None)  # [B,T,C]
+        enc_out = self.enc_embedding(x_enc)  # [B,T,C]
         # TimesNet
         for i in range(self.layer):
             enc_out = self.layer_norm(self.model[i](enc_out))
@@ -113,15 +114,15 @@ class Model(nn.Module):
         # De-Normalization from Non-stationary Transformer
         dec_out = dec_out * \
                   (stdev[:, 0, :].unsqueeze(1).repeat(
-                      1, self.pred_len + self.seq_len, 1))
+                      1, self.input_len, 1))
         dec_out = dec_out + \
                   (means[:, 0, :].unsqueeze(1).repeat(
-                      1, self.pred_len + self.seq_len, 1))
+                      1, self.input_len, 1))
         return dec_out
 
     def classification(self, x_enc, x_mark_enc):
         # embedding
-        enc_out = self.enc_embedding(x_enc, None)  # [B,T,C]
+        enc_out = self.enc_embedding(x_enc)  # [B,T,C]
         # TimesNet
         for i in range(self.layer):
             enc_out = self.layer_norm(self.model[i](enc_out))
@@ -137,11 +138,14 @@ class Model(nn.Module):
         output = self.projection(output)  # (batch_size, num_classes)
         return output
 
-    def forward(self, x_enc, x_mark_enc, x_dec, x_mark_dec, mask=None):
+    def forward(self, x_enc, x_mark_enc):
+        x_enc = x_enc.permute(0, 2, 1)
         if self.task_name == 'anomaly_detection':
             dec_out = self.anomaly_detection(x_enc)
-            return dec_out  # [B, L, D]
+            dec_out = dec_out.permute(0, 2, 1)
+            return dec_out  # [B, T, C]
         if self.task_name == 'classification':
             dec_out = self.classification(x_enc, x_mark_enc)
+            dec_out = dec_out.permute(0, 2, 1)
             return dec_out  # [B, N]
         return None

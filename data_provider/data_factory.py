@@ -25,6 +25,7 @@ def data_provider(args: argparse.Namespace, scalar=None):
             batch_size=batch_size,
             shuffle=False,
             num_workers=args.num_workers,
+            pin_memory=True,
             sampler=DistributedSampler(dataset, shuffle=shuffle) \
                 if args.use_gpu else \
                 RandomSampler(dataset, shuffle=shuffle)
