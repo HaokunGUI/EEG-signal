@@ -138,3 +138,34 @@ def getOriginalData(x:torch.Tensor, isAug:torch.Tensor):
     x_new[:, channel_2, :] = x[:, channel_1, :]
     isAug = isAug.clone().reshape(-1, 1, 1).cuda()
     return x_new * isAug + x * (1 - isAug)
+
+def random_masking(xb:torch.Tensor, mask_ratio):
+    # x:[batch_size, nvar, patch_num, embedding_dim]
+    bs, nvars, L, D= xb.shape
+    x = xb.clone()
+    
+    len_keep = int(L * (1 - mask_ratio))
+        
+    noise = torch.rand(bs, nvars, L, device=xb.device)  # noise in [0, 1], bs x nvars x L
+        
+    # sort noise for each sample
+    ids_shuffle = torch.argsort(noise, dim=2)  # ascend: small is keep, large is remove
+    ids_restore = torch.argsort(ids_shuffle, dim=2)                                     # ids_restore: [bs x nvars x L]
+
+    # keep the first subset
+    ids_keep = ids_shuffle[:, :, :len_keep]                                              # ids_keep: [bs x nvars x len_keep]         
+    x_kept = torch.gather(x, dim=2, index=ids_keep.unsqueeze(-1).repeat(1, 1, 1, D))     # x_kept: [bs x nvars x len_keep x patch_len]
+   
+    # removed x
+    x_removed = torch.zeros(bs, nvars, L-len_keep, D, device=xb.device)                 # x_removed: [bs x nvars x (L-len_keep) x patch_len]
+    x_ = torch.cat([x_kept, x_removed], dim=2)                                          # x_: [bs x nvars x L x patch_len]
+
+    # combine the kept part and the removed one
+    x_masked = torch.gather(x_, dim=2, index=ids_restore.unsqueeze(-1).repeat(1,1,1,D)) # x_masked: [bs x nvars x num_patch x patch_len]
+
+    # generate the binary mask: 0 is keep, 1 is remove
+    mask = torch.ones([bs, nvars, L], device=x.device)                                  # mask: [bs x nvars x num_patch]
+    mask[:, :, :len_keep] = 0
+    # unshuffle to get the binary mask
+    mask = torch.gather(mask, dim=2, index=ids_restore)                                  # [bs x nvars x num_patch]
+    return x_masked, x_kept, mask, ids_restore

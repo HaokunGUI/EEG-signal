@@ -100,3 +100,62 @@ class PatchEmbedding(nn.Module):
         # Input encoding
         x = self.value_embedding(x) + self.position_embedding(x)
         return self.dropout(x), n_vars
+
+
+class Tokenizer(nn.Module):
+    def __init__(self, in_channel: int, patch_size: int, embedding_dim: int, shared_embedding: bool = False):
+        """
+        Initializes a Tokenizer module for processing input data.
+
+        Args:
+            in_channel (int): The number of input channels in the time series data.
+            patch_size (int): The size of the data patches to be processed.
+            embedding_dim (int): The dimension of the output embeddings.
+            shared_embedding (bool, optional): If True, share the embedding layer across input channels.
+                Defaults to False.
+        """
+        super(Tokenizer, self).__init__()
+        self.patch_size = patch_size
+        self.embedding_dim = embedding_dim
+        self.in_channel = in_channel
+        self.share_embedding = shared_embedding
+        # Define a linear layer for encoding the input data.
+        if not shared_embedding:
+            self.encoding = nn.ModuleList()
+            for _ in range(in_channel):
+                self.encoding.append(nn.Linear(patch_size, embedding_dim))
+        else:
+            self.encoding = nn.Linear(patch_size, embedding_dim)
+
+    def forward(self, input: torch.Tensor):
+        """
+        Forward pass of the Tokenizer.
+
+        Args:
+            input (torch.Tensor): The input data tensor with dimensions (B, S, D), where
+                B is the batch size, S is the sequence length, and D is the input data dimension.
+
+        Returns:
+            torch.Tensor: The encoded data tensor with dimensions (B, D, patch_num, embedding_dim), where
+                B is the batch size, D is the input data dimension, patch_num is the num of the patch block 
+                and embedding_dim is the specified embedding dimension.
+        """
+        B, S, D = input.shape
+        assert S % self.patch_size == 0, 'Input sequence length must be divisible by the patch size.'
+
+        # Calculate the number of patches.
+        patch_num = S // self.patch_size
+
+        # Reshape the input into patches, resulting in a tensor with dimensions (B, D, patch_num, patch_size).
+        sequence = input.reshape(B, patch_num, self.patch_size, D).permute(0, 3, 1, 2)
+
+        # Apply the linear layer (encoding) to the sequence.
+        if not self.share_embedding:
+            x_out = []
+            for i in range(self.in_channel):
+                x_out.append(self.encoding[i](sequence[:, i, :, :]))
+            encoding = torch.stack(x_out, dim=1)
+        else:
+            encoding = self.encoding(sequence)
+
+        return encoding

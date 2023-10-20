@@ -143,7 +143,7 @@ class Model(nn.Module):
         if self.task_name == 'anomaly_detection':
             dec_out = self.anomaly_detection(x_enc)
             dec_out = dec_out.permute(0, 2, 1)
-            return dec_out  # [B, T, C]
+            return dec_out  # [B, C, T]
         if self.task_name == 'classification':
             dec_out = self.classification(x_enc, x_mark_enc)
             dec_out = dec_out.permute(0, 2, 1)

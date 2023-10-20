@@ -20,6 +20,7 @@ from utils.constants import *
 from torch.nn.parallel import DistributedDataParallel as DDP
 import os
 import torch.distributed as dist
+import torchmetrics
 from torchmetrics.classification import BinaryAccuracy, BinaryAUROC, BinaryPrecisionRecallCurve
 
 warnings.filterwarnings('ignore')
@@ -68,7 +69,7 @@ class Exp_Anomaly_Detection(Exp_Basic):
         if self.args.detection_type == 'classification':
             criterion = nn.BCEWithLogitsLoss().cuda()
         elif self.args.detection_type == 'restruction':
-            criterion = nn.MSELoss(reduction='none').cuda()
+            criterion = nn.L1Loss(reduction='none').cuda()
         else:
             raise NotImplementedError
         return criterion
@@ -159,7 +160,7 @@ class Exp_Anomaly_Detection(Exp_Basic):
         for epoch in range(self.args.num_epochs): 
             start_draw = True
             self.model.train()
-
+            train_score = []
             with tqdm(train_loader.dataset, desc=f'Epoch: {epoch + 1} / {self.args.num_epochs}', \
                                               disable=(self.device != 0)) as progress_bar:
                 for x, y, augment in train_loader:
@@ -209,7 +210,9 @@ class Exp_Anomaly_Detection(Exp_Basic):
                         loss = self.criterion(y_pred, y).to(self.device)
                     elif self.args.model == 'TimesNet':
                         y_pred = self.model(x, None)
-                        loss = torch.mean(self.criterion(y_pred, x)).to(self.device)
+                        score = self.criterion(y_pred, x).mean(-1).mean(-1)
+                        train_score.append(score.clone().detach())
+                        loss = torch.mean(score).to(self.device)
                     else:
                         pass
 
@@ -243,12 +246,12 @@ class Exp_Anomaly_Detection(Exp_Basic):
                     saver.save(epoch, self.model, model_optim, vali_metrics['auroc'])
                     early_stopping(vali_metrics['auroc'])
                 elif self.args.detection_type == 'restruction':
-                    vali_metrics = self.restruction_valid()
+                    vali_metrics = self.restruction_valid(torch.cat(train_score, dim=0))
                     self.logging.add_scalar('vali/acc', vali_metrics['acc'], epoch)
                     self.logging.add_scalar('vali/auroc', vali_metrics['auroc'], epoch)
                     self.logging.add_scalar('vali/threshold', vali_metrics['threshold'], epoch)
                     saver.save(epoch, self.model, model_optim, vali_metrics['auroc'], 
-                               param_dict={'threshold', vali_metrics['threshold']})
+                               param_dict={'threshold': int(vali_metrics['threshold'])})
                     early_stopping(vali_metrics['auroc'])
 
                 if early_stopping.early_stop:
@@ -380,15 +383,15 @@ class Exp_Anomaly_Detection(Exp_Basic):
         dist.barrier()
         return best_thresh
     
-    def restruction_valid(self, ):
-        _, train_loader = self._get_data(flag='train')
+    def restruction_valid(self, train_score):
         _, vali_loader = self._get_data(flag='dev')
 
         self.model.eval()
-        attens_train = []
         attens_vali = []
         y_vali = []
         with torch.no_grad():
+            attens_train = train_score
+
             for x, y, _ in tqdm(vali_loader, disable=(self.device != 0)):
                 x = x.float().to(self.device)
                 y = y.to(self.device)
@@ -402,7 +405,8 @@ class Exp_Anomaly_Detection(Exp_Basic):
             attens_vali = torch.cat(attens_vali, dim=0).reshape(-1)
             y_vali = torch.cat(y_vali, dim=0).reshape(-1).int()
 
-            combined_energy = np.array(attens_vali.cpu())
+            combined_attens = torch.cat([attens_train, attens_vali], dim=0)
+            combined_energy = np.array(combined_attens.cpu())
             threshold = np.percentile(combined_energy, 100 - self.args.anomaly_ratio)
 
             pred = (attens_vali > threshold).int()
