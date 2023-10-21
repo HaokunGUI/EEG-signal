@@ -45,11 +45,7 @@ class CheckpointSaver:
         return ((self.maximize_metric and self.best_val <= metric_val)
                 or (not self.maximize_metric and self.best_val >= metric_val))
 
-    def _print(self, message):
-        """Print a message if logging is enabled."""
-        pass
-
-    def save(self, epoch, model, optimizer, metric_val, param_dict=None):
+    def save(self, epoch, model, optimizer, metric_val):
         """Save model parameters to disk.
         Args:
             epoch (int): Current epoch.
@@ -74,10 +70,6 @@ class CheckpointSaver:
             self.best_val = metric_val
             best_path = os.path.join(self.save_dir, 'best.pth.tar')
             shutil.copy(checkpoint_path, best_path)
-            if param_dict is not None:
-                with open(os.path.join(self.save_dir, 'params.json'), 'w') as f:
-                    json.dump(param_dict, f, indent=4, sort_keys=True)
-
 
 
 def load_model_checkpoint(checkpoint_file, model, optimizer=None, map_location=None):

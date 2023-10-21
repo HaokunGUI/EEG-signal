@@ -72,7 +72,6 @@ if __name__ == '__main__':
     # detection task
     parser.add_argument('--scale_ratio', type=float, default=1.0, help='scale ratio of train data')
     parser.add_argument('--balanced', action='store_true', help='balanced data or not', default=False)
-    parser.add_argument('--anomaly_ratio', type=float, default=0.1, help='anomaly ratio of train data')
 
     # graph setting
     parser.add_argument('--graph_type', type=str, default='correlation', help='graph type, option:[distance, correlation]')
@@ -141,13 +140,5 @@ if __name__ == '__main__':
     if args.use_fft:
         args.input_dim = args.input_dim // 2
         args.output_dim = args.output_dim // 2
-
-    if args.task_name == 'anomaly_detection':
-        if args.model in ['DCRNN']:
-            args.detection_type = 'classification'
-        elif args.model in ['TimesNet']:
-            args.detection_type = 'restruction'
-        else:
-            args.detection_type = 'None'
     
     main(args)

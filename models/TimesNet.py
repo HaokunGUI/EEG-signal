@@ -8,7 +8,7 @@ from layers.Conv_Blocks import Inception_Block_V1
 
 def FFT_for_Period(x, k=2):
     # [B, T, C]
-    xf = torch.fft.rfft(x, dim=1)
+    xf = torch.fft.rfft(x, dim=1, norm='ortho')
     # find period by amplitudes
     frequency_list = abs(xf).mean(0).mean(-1)
     frequency_list[0] = 0
@@ -79,48 +79,22 @@ class Model(nn.Module):
         super(Model, self).__init__()
         self.args = args
         self.task_name = args.task_name
-        self.input_len = args.input_dim
-        self.output_len = args.output_dim
         self.model = nn.ModuleList([TimesBlock(args)
                                     for _ in range(args.e_layers)])
         self.enc_embedding = DataEmbedding(args.num_nodes, args.d_model, args.input_dim, args.dropout)
         self.layer = args.e_layers
         self.layer_norm = nn.LayerNorm(args.d_model)
+        self.act = F.gelu
+        self.dropout = nn.Dropout(args.dropout)
         if self.task_name == 'anomaly_detection':
             self.projection = nn.Linear(
-                args.d_model, args.num_nodes, bias=True)
+                args.d_model * args.input_dim, 1)
         if self.task_name == 'classification':
-            self.act = F.gelu
-            self.dropout = nn.Dropout(args.dropout)
             self.projection = nn.Linear(
-                args.d_model * args.input_len, args.num_class)
+                args.d_model * args.input_dim, args.num_class)
 
-    def anomaly_detection(self, x_enc):
-        # Normalization from Non-stationary Transformer
-        means = x_enc.mean(1, keepdim=True).detach()
-        x_enc = x_enc - means
-        stdev = torch.sqrt(
-            torch.var(x_enc, dim=1, keepdim=True, unbiased=False) + 1e-5)
-        x_enc /= stdev
-
-        # embedding
-        enc_out = self.enc_embedding(x_enc)  # [B,T,C]
-        # TimesNet
-        for i in range(self.layer):
-            enc_out = self.layer_norm(self.model[i](enc_out))
-        # porject back
-        dec_out = self.projection(enc_out)
-
-        # De-Normalization from Non-stationary Transformer
-        dec_out = dec_out * \
-                  (stdev[:, 0, :].unsqueeze(1).repeat(
-                      1, self.input_len, 1))
-        dec_out = dec_out + \
-                  (means[:, 0, :].unsqueeze(1).repeat(
-                      1, self.input_len, 1))
-        return dec_out
-
-    def classification(self, x_enc, x_mark_enc):
+    def forward(self, x_enc):
+        x_enc = x_enc.permute(0, 2, 1)
         # embedding
         enc_out = self.enc_embedding(x_enc)  # [B,T,C]
         # TimesNet
@@ -131,21 +105,7 @@ class Model(nn.Module):
         # the output transformer encoder/decoder embeddings don't include non-linearity
         output = self.act(enc_out)
         output = self.dropout(output)
-        # zero-out padding embeddings
-        output = output * x_mark_enc.unsqueeze(-1)
         # (batch_size, seq_length * d_model)
         output = output.reshape(output.shape[0], -1)
-        output = self.projection(output)  # (batch_size, num_classes)
-        return output
-
-    def forward(self, x_enc, x_mark_enc):
-        x_enc = x_enc.permute(0, 2, 1)
-        if self.task_name == 'anomaly_detection':
-            dec_out = self.anomaly_detection(x_enc)
-            dec_out = dec_out.permute(0, 2, 1)
-            return dec_out  # [B, C, T]
-        if self.task_name == 'classification':
-            dec_out = self.classification(x_enc, x_mark_enc)
-            dec_out = dec_out.permute(0, 2, 1)
-            return dec_out  # [B, N]
-        return None
+        dec_out = self.projection(output)  # (batch_size, num_classes)
+        return dec_out  # [B, N]
