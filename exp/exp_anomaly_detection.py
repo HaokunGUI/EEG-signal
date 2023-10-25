@@ -19,9 +19,8 @@ from torch.optim.lr_scheduler import CosineAnnealingLR
 from utils.constants import *
 from torch.nn.parallel import DistributedDataParallel as DDP
 import os
-import torch.distributed as dist
 from torchvision.ops.focal_loss import sigmoid_focal_loss
-from torchmetrics.classification import BinaryAccuracy, BinaryAUROC, BinaryPrecisionRecallCurve
+from torchmetrics.classification import BinaryAccuracy, BinaryAUROC, BinaryPrecisionRecallCurve, BinaryRecall, BinaryF1Score
 
 warnings.filterwarnings('ignore')
 
@@ -34,7 +33,7 @@ class Exp_Anomaly_Detection(Exp_Basic):
         # model init
         model = self.model_dict[self.args.model].Model(self.args).cuda()
         if self.args.use_gpu:
-            model = DDP(model, device_ids=[self.device])
+            model = DDP(model, device_ids=[self.device], find_unused_parameters=True)
         if self.args.use_pretrained:
             load_model_checkpoint(self.args.pretrained_path, model, map_location=self.device)
         return model
@@ -68,6 +67,7 @@ class Exp_Anomaly_Detection(Exp_Basic):
     def _select_criterion(self):
         if self.args.model in ['DCRNN']:
             criterion = nn.BCEWithLogitsLoss().cuda()
+            # criterion = sigmoid_focal_loss
         elif self.args.model in ['TimesNet']:
             criterion = sigmoid_focal_loss
         else:
@@ -102,7 +102,7 @@ class Exp_Anomaly_Detection(Exp_Basic):
                     x = x.permute(0, 2, 1, 3)
 
                 if self.args.use_fft:
-                    x = torch.fft.rfft(x)[..., :self.args.input_dim]
+                    x = torch.fft.rfft(x)[..., 1:self.args.input_dim+1]
                     x = torch.log(torch.abs(x) + 1e-8)
 
                 if self.args.model == 'DCRNN':
@@ -176,7 +176,7 @@ class Exp_Anomaly_Detection(Exp_Basic):
                             x = x.permute(0, 2, 1, 3)
 
                         if self.args.use_fft:
-                            x = torch.fft.rfft(x)[..., :self.args.input_dim]
+                            x = torch.fft.rfft(x)[..., 1:self.args.input_dim+1]
                             x = torch.log(torch.abs(x) + 1e-8)
 
                         if self.args.use_graph and start_draw:
@@ -199,13 +199,13 @@ class Exp_Anomaly_Detection(Exp_Basic):
                     if self.args.model == 'DCRNN':
                         seq_len = torch.ones(x.shape[0], dtype=torch.int64).cuda() * self.args.input_len
                         y_pred = self.model(x, seq_len, supports)
-                        loss = self.criterion(y_pred, y).to(self.device)
+                        loss = self.criterion(y_pred, y)
                     elif self.args.model == 'TimesNet':
                         y_pred = self.model(x)
                         loss = self.criterion(y_pred, y, reduction='mean')
                     else:
                         pass
-
+                    
                     loss_val = loss.item()
                     acc_metric = BinaryAccuracy().cuda()
                     acc = acc_metric(torch.sigmoid(y_pred), y).item()
@@ -243,8 +243,6 @@ class Exp_Anomaly_Detection(Exp_Basic):
         path = os.path.join(path_dir, model_file)
         load_model_checkpoint(path, self.model, map_location=self.device)
 
-        # threshold = self._cal_best_threshold()
-
         self.model.eval()
         y_trues = []
         y_preds = []
@@ -265,7 +263,7 @@ class Exp_Anomaly_Detection(Exp_Basic):
                     x = x.permute(0, 2, 1, 3)
 
                 if self.args.use_fft:
-                    x = torch.fft.rfft(x)[..., :self.args.input_dim]
+                    x = torch.fft.rfft(x)[..., 1:self.args.input_dim+1]
                     x = torch.log(torch.abs(x) + 1e-8)
 
                 if self.args.model == 'DCRNN':
@@ -279,14 +277,20 @@ class Exp_Anomaly_Detection(Exp_Basic):
                 y_preds.append(y_pred)
                 y_trues.append(y)
 
-            y_pred = torch.cat(y_preds, dim=0).reshape(-1).int()
-            y_true = torch.cat(y_trues, dim=0).reshape(-1).int()
+            y_pred = torch.cat(y_preds, dim=0)
+            y_true = torch.cat(y_trues, dim=0)
             acc_metric = BinaryAccuracy().cuda()
             acc = acc_metric(torch.sigmoid(y_pred), y_true).cpu().item()
             auroc = self.auroc(torch.sigmoid(y_pred), y_true).cpu().item()
+            recall_metric = BinaryRecall().cuda()
+            f1_score_metric = BinaryF1Score().cuda()
+            recall = recall_metric(torch.sigmoid(y_pred), y_true).cpu().item()
+            f1_score = f1_score_metric(torch.sigmoid(y_pred), y_true).cpu().item()
 
         self.logging.add_scalar('test/acc', acc)
         self.logging.add_scalar('test/auroc', auroc)
+        self.logging.add_scalar('test/recall', recall)
+        self.logging.add_scalar('test/f1_score', f1_score)
         return
     
     def _cal_best_threshold(self,):
@@ -312,7 +316,7 @@ class Exp_Anomaly_Detection(Exp_Basic):
                     x = x.permute(0, 2, 1, 3)
 
                 if self.args.use_fft:
-                    x = torch.fft.rfft(x)[..., :self.args.input_dim]
+                    x = torch.fft.rfft(x)[..., 1:self.args.input_dim+1]
                     x = torch.log(torch.abs(x) + 1e-8)
 
                 if self.args.model == 'DCRNN':

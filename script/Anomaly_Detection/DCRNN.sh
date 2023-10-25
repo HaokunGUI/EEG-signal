@@ -1,6 +1,6 @@
 torchrun \
     --standalone \
-    --nproc_per_node=4 \
+    --nproc_per_node=1 \
     run.py \
     --task_name anomaly_detection \
     --model DCRNN \
@@ -11,5 +11,7 @@ torchrun \
     --data_augment \
     --use_pretrained \
     --patience 0 \
-    --pretrained_path "/home/guihaokun/Time-Series-Pretrain/logging/ssl/DCRNN_231019_012648/checkpoint/last.pth.tar"\
-    --balanced 
+    --pretrained_path "/home/guihaokun/Time-Series-Pretrain/logging/ssl/DCRNN/DCRNN_231024_002838/checkpoint/last.pth.tar"\
+    --dropout 0.5 \
+    --balanced \
+    --num_epochs 60

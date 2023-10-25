@@ -1,6 +1,6 @@
 import os
 import torch
-from models import TimesNet, DCRNN
+from models import TimesNet, DCRNN, VQ_BERT
 from tensorboardX import SummaryWriter
 from utils.tools import WriterFilter
 import datetime
@@ -12,6 +12,7 @@ class Exp_Basic(object):
         self.model_dict = {
             'TimesNet': TimesNet,
             'DCRNN': DCRNN,
+            'VQ_BERT': VQ_BERT,
         }
         self.device = self._acquire_device()
         self.model = self._build_model()

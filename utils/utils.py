@@ -3,7 +3,8 @@ import os
 import shutil
 import queue
 from utils.constants import INCLUDED_CHANNELS
-import json
+import numpy as np
+from typing import Optional, Tuple
 
 class CheckpointSaver:
     """Class to save and load model checkpoints.
@@ -131,33 +132,162 @@ def getOriginalData(x:torch.Tensor, isAug:torch.Tensor):
     isAug = isAug.clone().reshape(-1, 1, 1).cuda()
     return x_new * isAug + x * (1 - isAug)
 
-def random_masking(xb:torch.Tensor, mask_ratio):
-    # x:[batch_size, nvar, patch_num, embedding_dim]
-    bs, nvars, L, D= xb.shape
-    x = xb.clone()
-    
-    len_keep = int(L * (1 - mask_ratio))
-        
-    noise = torch.rand(bs, nvars, L, device=xb.device)  # noise in [0, 1], bs x nvars x L
-        
-    # sort noise for each sample
-    ids_shuffle = torch.argsort(noise, dim=2)  # ascend: small is keep, large is remove
-    ids_restore = torch.argsort(ids_shuffle, dim=2)                                     # ids_restore: [bs x nvars x L]
 
-    # keep the first subset
-    ids_keep = ids_shuffle[:, :, :len_keep]                                              # ids_keep: [bs x nvars x len_keep]         
-    x_kept = torch.gather(x, dim=2, index=ids_keep.unsqueeze(-1).repeat(1, 1, 1, D))     # x_kept: [bs x nvars x len_keep x patch_len]
-   
-    # removed x
-    x_removed = torch.zeros(bs, nvars, L-len_keep, D, device=xb.device)                 # x_removed: [bs x nvars x (L-len_keep) x patch_len]
-    x_ = torch.cat([x_kept, x_removed], dim=2)                                          # x_: [bs x nvars x L x patch_len]
+def compute_mask_indices(
+    shape: Tuple[int, int],
+    padding_mask: Optional[torch.Tensor],
+    mask_prob: float,
+    mask_length: int,
+    mask_type: str = "static",
+    mask_other: float = 0.0,
+    min_masks: int = 0,
+    no_overlap: bool = False,
+    min_space: int = 0,
+    require_same_masks: bool = True,
+    mask_dropout: float = 0.0,
+    add_masks: bool = False,
+    seed: Optional[int] = None,
+    epoch: Optional[int] = None,
+    indices: Optional[torch.Tensor] = None,
+) -> np.ndarray:
+    """
+    Computes random mask spans for a given shape
 
-    # combine the kept part and the removed one
-    x_masked = torch.gather(x_, dim=2, index=ids_restore.unsqueeze(-1).repeat(1,1,1,D)) # x_masked: [bs x nvars x num_patch x patch_len]
+    Args:
+        shape: the the shape for which to compute masks.
+            should be of size 2 where first element is batch size and 2nd is timesteps
+        padding_mask: optional padding mask of the same size as shape, which will prevent masking padded elements
+        mask_prob: probability for each token to be chosen as start of the span to be masked. this will be multiplied by
+            number of timesteps divided by length of mask span to mask approximately this percentage of all elements.
+            however due to overlaps, the actual number will be smaller (unless no_overlap is True)
+        mask_type: how to compute mask lengths
+            static = fixed size
+            uniform = sample from uniform distribution [mask_other, mask_length*2]
+            normal = sample from normal distribution with mean mask_length and stdev mask_other. mask is min 1 element
+            poisson = sample from possion distribution with lambda = mask length
+        min_masks: minimum number of masked spans
+        no_overlap: if false, will switch to an alternative recursive algorithm that prevents spans from overlapping
+        min_space: only used if no_overlap is True, this is how many elements to keep unmasked between spans
+        require_same_masks: if true, will randomly drop out masks until same amount of masks remains in each sample
+        mask_dropout: randomly dropout this percentage of masks in each example
+    """
 
-    # generate the binary mask: 0 is keep, 1 is remove
-    mask = torch.ones([bs, nvars, L], device=x.device)                                  # mask: [bs x nvars x num_patch]
-    mask[:, :, :len_keep] = 0
-    # unshuffle to get the binary mask
-    mask = torch.gather(mask, dim=2, index=ids_restore)                                  # [bs x nvars x num_patch]
-    return x_masked, x_kept, mask, ids_restore
+    bsz, all_sz = shape
+    mask = np.full((bsz, all_sz), False)
+
+    mask_idcs = []
+    for i in range(bsz):
+        if seed is not None and epoch is not None and indices is not None:
+            seed_i = int(hash((seed, epoch, indices[i].item())) % 1e6)
+        else:
+            seed_i = None
+
+        rng = np.random.default_rng(seed_i)
+
+        if padding_mask is not None:
+            sz = all_sz - padding_mask[i].long().sum().item()
+            assert sz >= 0, sz
+        else:
+            sz = all_sz
+
+        num_mask = int(
+            # add a random number for probabilistic rounding
+            mask_prob * sz / float(mask_length)
+            + rng.random()
+        )
+        num_mask = max(min_masks, num_mask)
+
+        if mask_type == "static":
+            lengths = np.full(num_mask, mask_length)
+        elif mask_type == "uniform":
+            lengths = rng.integers(mask_other, mask_length * 2 + 1, size=num_mask)
+        elif mask_type == "normal":
+            lengths = rng.normal(mask_length, mask_other, size=num_mask)
+            lengths = [max(1, int(round(x))) for x in lengths]
+        elif mask_type == "poisson":
+            lengths = rng.poisson(mask_length, size=num_mask)
+            lengths = [int(round(x)) for x in lengths]
+        else:
+            raise Exception("unknown mask selection " + mask_type)
+
+        if sum(lengths) == 0:
+            if mask_type == "static":
+                raise ValueError(f"this should never happens")
+            else:
+                lengths = [min(mask_length, sz - 1)]
+
+        if no_overlap:
+            mask_idc = []
+
+            def arrange(s, e, length, keep_length):
+                span_start = rng.integers(s, e - length)
+                mask_idc.extend(span_start + i for i in range(length))
+
+                new_parts = []
+                if span_start - s - min_space >= keep_length:
+                    new_parts.append((s, span_start - min_space + 1))
+                if e - span_start - length - min_space > keep_length:
+                    new_parts.append((span_start + length + min_space, e))
+                return new_parts
+
+            parts = [(0, sz)]
+            min_length = min(lengths)
+            for length in sorted(lengths, reverse=True):
+                lens = np.fromiter(
+                    (e - s if e - s >= length + min_space else 0 for s, e in parts),
+                    int,
+                )
+                l_sum = np.sum(lens)
+                if l_sum == 0:
+                    break
+                probs = lens / np.sum(lens)
+                c = rng.choice(len(parts), p=probs)
+                s, e = parts.pop(c)
+                parts.extend(arrange(s, e, length, min_length))
+            mask_idc = np.asarray(mask_idc)
+        else:
+            mask_idc = rng.choice(sz, num_mask, replace=False)
+            mask_idc = np.asarray(
+                [
+                    mask_idc[j] + offset
+                    for j in range(len(mask_idc))
+                    for offset in range(lengths[j])
+                ]
+            )
+
+        mask_idc = np.unique(mask_idc[mask_idc < sz])
+        if len(mask_idc) >= sz:
+            raise ValueError(
+                (
+                    f"the entire sequence is masked. "
+                    f"sz={sz}; mask_idc[mask_idc]; "
+                    f"index={indices[i] if indices is not None else None}"
+                )
+            )
+        mask_idcs.append(mask_idc)
+
+    target_len = None
+    if require_same_masks:
+        if add_masks:
+            target_len = max([len(m) for m in mask_idcs])
+        else:
+            target_len = min([len(m) for m in mask_idcs])
+
+    for i, mask_idc in enumerate(mask_idcs):
+        if target_len is not None and len(mask_idc) > target_len:
+            mask_idc = rng.choice(mask_idc, target_len, replace=False)
+
+        mask[i, mask_idc] = True
+
+        if target_len is not None and len(mask_idc) < target_len:
+            unmasked = np.flatnonzero(~mask[i])
+            to_mask = rng.choice(unmasked, target_len - len(mask_idc), replace=False)
+            mask[i, to_mask] = True
+
+        if mask_dropout > 0:
+            masked = np.flatnonzero(mask[i])
+            num_holes = np.rint(len(masked) * mask_dropout).astype(int)
+            to_drop = rng.choice(masked, num_holes, replace=False)
+            mask[i, to_drop] = False
+
+    return mask

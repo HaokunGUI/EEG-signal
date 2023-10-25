@@ -30,7 +30,7 @@ class Exp_SSL(Exp_Basic):
         # model init
         model = self.model_dict[self.args.model].Model(self.args).cuda()
         if self.args.use_gpu:
-            model = DDP(model, device_ids=[self.device])
+            model = DDP(model, device_ids=[self.device], find_unused_parameters=True)
         return model
     
     def _get_scalar(self):
@@ -60,7 +60,10 @@ class Exp_SSL(Exp_Basic):
         return model_optim
 
     def _select_criterion(self):
-        criterion = loss_fn(self.scalar, self.args.loss_fn, is_tensor=True, mask_val=0.)
+        if self.args.model in ['DCRNN']:
+            criterion = loss_fn(self.scalar, self.args.loss_fn, is_tensor=True, mask_val=0.)
+        elif self.args.model in ['VQ_BERT']:
+            criterion = nn.CrossEntropyLoss().to(self.device)
         return criterion
     
     def _select_scheduler(self, optimizer):
@@ -90,15 +93,20 @@ class Exp_SSL(Exp_Basic):
                     y = y.permute(0, 2, 1, 3)
 
                 if self.args.use_fft:
-                    x = torch.fft.rfft(x)[..., :self.args.input_dim]
+                    x = torch.fft.rfft(x)[..., 1:self.args.input_dim+1]
                     x = torch.log(torch.abs(x) + 1e-8)
-                    y = torch.fft.rfft(y)[..., :self.args.output_dim]
+                    y = torch.fft.rfft(y)[..., 1:self.args.output_dim+1]
                     y = torch.log(torch.abs(y) + 1e-8)
 
-                y_pred = self.model(x, y, supports, None)
-
-                y_pred = y_pred.detach()
-                loss = criterion(y, y_pred).cpu()
+                if self.args.model in ['DCRNN']:
+                    y_pred = self.model(x, y, supports, None)
+                    loss = criterion(y, y_pred).cpu()
+                elif self.args.model in ['VQ_BERT']:
+                    inputs = torch.cat([x, y], dim=-1)
+                    pred, label = self.model(inputs)
+                    loss = criterion(pred, label).cpu()
+                else:
+                    raise NotImplementedError
                 loss_val = loss.item()
                 losses.append(loss_val)
 
@@ -159,9 +167,9 @@ class Exp_SSL(Exp_Basic):
                             y = y.permute(0, 2, 1, 3)
 
                         if self.args.use_fft:
-                            x = torch.fft.rfft(x)[..., :self.args.input_dim]
+                            x = torch.fft.rfft(x)[..., 1:self.args.input_dim+1]
                             x = torch.log(torch.abs(x) + 1e-8)
-                            y = torch.fft.rfft(y)[..., :self.args.output_dim]
+                            y = torch.fft.rfft(y)[..., 1:self.args.output_dim+1]
                             y = torch.log(torch.abs(y) + 1e-8)
 
                         if self.args.use_graph and start_draw:
@@ -180,10 +188,16 @@ class Exp_SSL(Exp_Basic):
                                                      save_dir=os.path.join(self.logging_dir, 'graph'))
                                 self.logging.add_figure(f'graph/correlation_{epoch}', fig, epoch)
                                 start_draw = False
-
-                    seq_pred = self.model(x, y, supports, self.steps)
-
-                    loss = self.criterion(y, seq_pred).to(self.device)
+                    if self.args.model in ['DCRNN']:
+                        seq_pred = self.model(x, y, supports, self.steps)
+                        loss = self.criterion(y, seq_pred).to(self.device)
+                    elif self.args.model in ['VQ_BERT']:
+                        inputs = torch.cat([x, y], dim=-1)
+                        pred, label = self.model(inputs)
+                        loss = self.criterion(pred, label).to(self.device)
+                    else:
+                        raise NotImplementedError
+                    
                     loss_val = loss.item()
                     loss.backward()
 
@@ -199,7 +213,7 @@ class Exp_SSL(Exp_Basic):
 
             saver.save(epoch, self.model, model_optim, loss_val)
 
-            if (epoch+1) % self.args.eval_every == 0:
+            if (epoch+1) % self.args.eval_every == 0 and self.args.if_eval:
                 vali_loss = self.vali(vali_loader, self.criterion)
                 self.logging.add_scalar('vali/loss', vali_loss, epoch)
                 early_stopping(vali_loss)
@@ -240,14 +254,21 @@ class Exp_SSL(Exp_Basic):
                     y = y.permute(0, 2, 1, 3)
 
                 if self.args.use_fft:
-                    x = torch.fft.rfft(x)[..., :self.args.input_dim]
+                    x = torch.fft.rfft(x)[..., 1:self.args.input_dim+1]
                     x = torch.log(torch.abs(x) + 1e-8)
-                    y = torch.fft.rfft(y)[..., :self.args.output_dim]
+                    y = torch.fft.rfft(y)[..., 1:self.args.output_dim+1]
                     y = torch.log(torch.abs(y) + 1e-8)
 
-                y_pred = self.model(x, y, supports, None)
-
-                loss = criterion(y, y_pred).cpu()
+                if self.args.model in ['DCRNN']:
+                    y_pred = self.model(x, y, supports, None)
+                    loss = criterion(y, y_pred).cpu()
+                elif self.args.model in ['VQ_BERT']:
+                    inputs = torch.cat([x, y], dim=-1)
+                    pred, label = self.model(inputs)
+                    loss = criterion(pred, label).cpu()
+                else:
+                    raise NotImplementedError
+                
                 loss_val = loss.item()
                 losses.append(loss_val)
 

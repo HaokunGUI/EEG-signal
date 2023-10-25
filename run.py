@@ -68,6 +68,7 @@ if __name__ == '__main__':
     parser.add_argument('--time_step_len', type=int, default=1, help='time step length')
     parser.add_argument('--use_fft', action='store_true', help='use fft or not', default=False)
     parser.add_argument('--loss_fn', type=str, default='mae', help='loss function, options:[mse, mae]')
+    parser.add_argument('--if_eval', action='store_true', help='evaluate or not', default=False)
 
     # detection task
     parser.add_argument('--scale_ratio', type=float, default=1.0, help='scale ratio of train data')
@@ -94,6 +95,20 @@ if __name__ == '__main__':
     parser.add_argument('--num_kernels', type=int, default=5, help='Number of each kind of kernel.')
     parser.add_argument('--d_model', type=int, default=16, help='hidden dimension of channels')
     parser.add_argument('--e_layers', type=int, default=3, help='Number of encoder layers.')
+    parser.add_argument('--attn_head', type=int, default=4, help='Number of attention heads.')
+    parser.add_argument('--kernel_size', type=int, default=3, help='Kernel size.')
+
+
+    # quantization
+    parser.add_argument('--num_embedding', type=int, default=512, help='number of embedding vectors')
+    parser.add_argument('--codebook_num', type=int, default=4, help='number of codebooks')
+
+    # masking
+    parser.add_argument('--mask_ratio', type=float, default=0.2, help='mask ratio')
+    parser.add_argument('--mask_length', type=int, default=10, help='mask length')
+    parser.add_argument('--no_overlap', action='store_true', default=False, help='mask overlap or not')
+    parser.add_argument('--min_space', type=int, default=1, help='min space between mask')
+    parser.add_argument('--mask_dropout', type=float, default=0.0, help='mask dropout ratio')
 
     # optimization
     parser.add_argument('--num_epochs', type=int, default=60, help='train epochs')
