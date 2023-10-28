@@ -65,7 +65,7 @@ class Exp_Anomaly_Detection(Exp_Basic):
         return model_optim
 
     def _select_criterion(self):
-        if self.args.model in ['DCRNN']:
+        if self.args.model in ['DCRNN', 'VQ_BERT']:
             criterion = nn.BCEWithLogitsLoss().cuda()
             # criterion = sigmoid_focal_loss
         elif self.args.model in ['TimesNet']:
@@ -102,14 +102,13 @@ class Exp_Anomaly_Detection(Exp_Basic):
                     x = x.permute(0, 2, 1, 3)
 
                 if self.args.use_fft:
-                    x = torch.fft.rfft(x)[..., 1:self.args.input_dim+1]
+                    x = torch.fft.rfft(x)[..., 1:]
                     x = torch.log(torch.abs(x) + 1e-8)
 
-                if self.args.model == 'DCRNN':
+                if self.args.model in ['DCRNN']:
                     seq_len = torch.ones(x.shape[0], dtype=torch.int64).cuda() * self.args.input_len
                     y_pred = self.model(x, seq_len, supports)
-                    y_pred = y_pred.detach()
-                elif self.args.model == 'TimesNet':
+                elif self.args.model in ['TimesNet', 'VQ_BERT']:
                     y_pred = self.model(x)
                 else:
                     pass
@@ -176,7 +175,7 @@ class Exp_Anomaly_Detection(Exp_Basic):
                             x = x.permute(0, 2, 1, 3)
 
                         if self.args.use_fft:
-                            x = torch.fft.rfft(x)[..., 1:self.args.input_dim+1]
+                            x = torch.fft.rfft(x)[..., 1:]
                             x = torch.log(torch.abs(x) + 1e-8)
 
                         if self.args.use_graph and start_draw:
@@ -196,13 +195,16 @@ class Exp_Anomaly_Detection(Exp_Basic):
                                 self.logging.add_figure(f'graph/correlation_{epoch}', fig, epoch)
                                 start_draw = False
 
-                    if self.args.model == 'DCRNN':
+                    if self.args.model in ['DCRNN']:
                         seq_len = torch.ones(x.shape[0], dtype=torch.int64).cuda() * self.args.input_len
                         y_pred = self.model(x, seq_len, supports)
                         loss = self.criterion(y_pred, y)
-                    elif self.args.model == 'TimesNet':
+                    elif self.args.model in ['TimesNet']:
                         y_pred = self.model(x)
                         loss = self.criterion(y_pred, y, reduction='mean')
+                    elif self.args.model in ['VQ_BERT']:
+                        y_pred = self.model(x)
+                        loss = self.criterion(y_pred, y)
                     else:
                         pass
                     
@@ -231,7 +233,7 @@ class Exp_Anomaly_Detection(Exp_Basic):
 
                 if early_stopping.early_stop:
                     break
-            scheduler.step()
+            # scheduler.step()
         return
 
     def test(self, model_file:str='best.pth.tar', model_dir:str=None):
@@ -263,13 +265,13 @@ class Exp_Anomaly_Detection(Exp_Basic):
                     x = x.permute(0, 2, 1, 3)
 
                 if self.args.use_fft:
-                    x = torch.fft.rfft(x)[..., 1:self.args.input_dim+1]
+                    x = torch.fft.rfft(x)[..., 1:]
                     x = torch.log(torch.abs(x) + 1e-8)
 
-                if self.args.model == 'DCRNN':
+                if self.args.model in ['DCRNN']:
                     seq_len = torch.ones(x.shape[0], dtype=torch.int64).cuda() * self.args.input_len
                     y_pred = self.model(x, seq_len, supports)
-                elif self.args.model == 'TimesNet':
+                elif self.args.model in ['TimesNet', 'VQ_BERT']:
                     y_pred = self.model(x)
                 else:
                     pass
@@ -293,62 +295,62 @@ class Exp_Anomaly_Detection(Exp_Basic):
         self.logging.add_scalar('test/f1_score', f1_score)
         return
     
-    def _cal_best_threshold(self,):
-        _, vali_loader = self._get_data(flag='dev')
+    # def _cal_best_threshold(self,):
+    #     _, vali_loader = self._get_data(flag='dev')
 
-        self.model.eval()
-        y_trues = []
-        y_preds = []
-        with torch.no_grad():
-            for x, y, _ in tqdm(vali_loader, disable=(self.device != 0)):
-                x = x.float().to(self.device)
-                y = y.to(self.device)
+    #     self.model.eval()
+    #     y_trues = []
+    #     y_preds = []
+    #     with torch.no_grad():
+    #         for x, y, _ in tqdm(vali_loader, disable=(self.device != 0)):
+    #             x = x.float().to(self.device)
+    #             y = y.to(self.device)
 
-                # get adjmat, supports
-                if self.args.use_graph:
-                    _, supports = get_supports(self.args, x)
-                else:
-                    supports = None
+    #             # get adjmat, supports
+    #             if self.args.use_graph:
+    #                 _, supports = get_supports(self.args, x)
+    #             else:
+    #                 supports = None
 
-                if self.args.using_patch:
-                    batch_size, node_num, seq_len = x.shape
-                    x = x.reshape(batch_size, node_num, -1, self.args.freq)
-                    x = x.permute(0, 2, 1, 3)
+    #             if self.args.using_patch:
+    #                 batch_size, node_num, seq_len = x.shape
+    #                 x = x.reshape(batch_size, node_num, -1, self.args.freq)
+    #                 x = x.permute(0, 2, 1, 3)
 
-                if self.args.use_fft:
-                    x = torch.fft.rfft(x)[..., 1:self.args.input_dim+1]
-                    x = torch.log(torch.abs(x) + 1e-8)
+    #             if self.args.use_fft:
+    #                 x = torch.fft.rfft(x)[..., 1:self.args.input_dim+1]
+    #                 x = torch.log(torch.abs(x) + 1e-8)
 
-                if self.args.model == 'DCRNN':
-                    seq_len = torch.ones(x.shape[0], dtype=torch.int64).cuda() * self.args.input_len
-                    y_pred = self.model(x, seq_len, supports)
-                elif self.args.model == 'TimesNet':
-                    y_pred = self.model(x)
-                else:
-                    pass
+    #             if self.args.model == 'DCRNN':
+    #                 seq_len = torch.ones(x.shape[0], dtype=torch.int64).cuda() * self.args.input_len
+    #                 y_pred = self.model(x, seq_len, supports)
+    #             elif self.args.model == 'TimesNet':
+    #                 y_pred = self.model(x)
+    #             else:
+    #                 pass
 
-                y_preds.append(y_pred)
-                y_trues.append(y)
+    #             y_preds.append(y_pred)
+    #             y_trues.append(y)
 
-            y_pred = torch.cat(y_preds, dim=0)
-            y_true = torch.cat(y_trues, dim=0)
-            metric = BinaryPrecisionRecallCurve().cuda()
-            precision, recall, thresholds = metric(torch.sigmoid(y_pred), y_true.int())
-            thresh_filt = []
-            fscore = []
-            n_thresh = len(thresholds)
-            for idx in range(n_thresh):
-                curr_f1 = (2 * precision[idx] * recall[idx]) / \
-                    (precision[idx] + recall[idx])
-                curr_f1 = curr_f1.cpu().item()
-                if not (np.isnan(curr_f1)):
-                    fscore.append(curr_f1)
-                    thresh_filt.append(thresholds[idx])
-            # locate the index of the largest f score
-            ix = np.argmax(np.array(fscore))
-            best_thresh = thresh_filt[ix].cpu().item()
-        if self.device == 0:
-            path = os.path.join(self.logging_dir, 'best_threshold.txt')
-            with open(path, 'w') as f:
-                f.write(str(best_thresh))
-        return best_thresh
+    #         y_pred = torch.cat(y_preds, dim=0)
+    #         y_true = torch.cat(y_trues, dim=0)
+    #         metric = BinaryPrecisionRecallCurve().cuda()
+    #         precision, recall, thresholds = metric(torch.sigmoid(y_pred), y_true.int())
+    #         thresh_filt = []
+    #         fscore = []
+    #         n_thresh = len(thresholds)
+    #         for idx in range(n_thresh):
+    #             curr_f1 = (2 * precision[idx] * recall[idx]) / \
+    #                 (precision[idx] + recall[idx])
+    #             curr_f1 = curr_f1.cpu().item()
+    #             if not (np.isnan(curr_f1)):
+    #                 fscore.append(curr_f1)
+    #                 thresh_filt.append(thresholds[idx])
+    #         # locate the index of the largest f score
+    #         ix = np.argmax(np.array(fscore))
+    #         best_thresh = thresh_filt[ix].cpu().item()
+    #     if self.device == 0:
+    #         path = os.path.join(self.logging_dir, 'best_threshold.txt')
+    #         with open(path, 'w') as f:
+    #             f.write(str(best_thresh))
+    #     return best_thresh

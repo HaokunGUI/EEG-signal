@@ -2,12 +2,12 @@ torchrun \
     --standalone \
     --nproc_per_node=4 \
     run.py \
-    --task_name ssl \
+    --task_name anomaly_detection \
     --model VQ_BERT \
     --learning_rate 1e-3 \
     --normalize \
     --patience 0 \
-    --num_epochs 300 \
+    --num_epochs 40 \
     --mask_length 10 \
     --mask_ratio 0.2 \
     --codebook_num 4 \
@@ -19,4 +19,6 @@ torchrun \
     --d_model 128 \
     --train_batch_size 64 \
     --test_batch_size 64 \
-    --dropout 0.2
+    --dropout 0.2 \
+    --balanced \
+    --pretrained_path "/home/guihaokun/Time-Series-Pretrain/logging/ssl/VQ_BERT/VQ_BERT_231026_020823/checkpoint/last.pth.tar"

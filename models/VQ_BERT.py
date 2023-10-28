@@ -63,6 +63,8 @@ class VQ_BERT(nn.Module):
             self.final_projector = nn.ModuleList()
             for _ in range(codebook_num):
                 self.final_projector.append(nn.Linear(hidden, num_embedding))
+        elif task_name == 'anomaly_detection':
+            self.final_projector = nn.Linear(hidden*patch_num*in_channel, 1)
 
 
     def forward(self, x):
@@ -103,16 +105,27 @@ class VQ_BERT(nn.Module):
             possibility = torch.cat(possibility, dim=-2) # [masked_num, codebook_num, num_embedding]
             quant_mask = quant_idx.view(-1, *quant_idx.shape[2:])[mask] # [masked_num, codebook_num]
             return possibility.view(-1, self.num_embedding), quant_mask.view(-1)
+        elif self.task_name == 'anomaly_detection':
+            flatten = nn.Flatten(start_dim=-2)
+            xm = flatten(xm)
+            xm = self.dropout(xm)
+            xm = xm.view(xm.shape[0], -1)
+            xm = self.final_projector(xm)
+            return xm
         else:
             return xm
 
 class Model(nn.Module):
     def __init__(self, args:argparse.Namespace):
         super(Model, self).__init__()
+        if args.task_name == 'ssl':
+            patch_num = args.input_len + args.output_len
+        else:
+            patch_num = args.input_len
         self.model = VQ_BERT(
             in_channel=args.num_nodes,
             patch_size=args.freq,
-            patch_num=args.input_len + args.output_len,
+            patch_num=patch_num,
             hidden=args.d_model,
             n_layers=args.e_layers,
             attn_heads=args.attn_head,
