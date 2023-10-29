@@ -68,7 +68,6 @@ if __name__ == '__main__':
     parser.add_argument('--time_step_len', type=int, default=1, help='time step length')
     parser.add_argument('--use_fft', action='store_true', help='use fft or not', default=False)
     parser.add_argument('--loss_fn', type=str, default='mae', help='loss function, options:[mse, mae]')
-    parser.add_argument('--if_eval', action='store_true', help='evaluate or not', default=False)
 
     # detection task
     parser.add_argument('--scale_ratio', type=float, default=1.0, help='scale ratio of train data')
@@ -97,10 +96,10 @@ if __name__ == '__main__':
     parser.add_argument('--e_layers', type=int, default=3, help='Number of encoder layers.')
     parser.add_argument('--attn_head', type=int, default=4, help='Number of attention heads.')
     parser.add_argument('--kernel_size', type=int, default=3, help='Kernel size.')
-
+    parser.add_argument('--enc_type', type=str, default='rel', help='Encoder type, options:[abs, rel]')
 
     # quantization
-    parser.add_argument('--num_embedding', type=int, default=512, help='number of embedding vectors')
+    parser.add_argument('--codebook_item', type=int, default=512, help='number of embedding vectors')
     parser.add_argument('--codebook_num', type=int, default=4, help='number of codebooks')
 
     # masking
@@ -116,6 +115,7 @@ if __name__ == '__main__':
     parser.add_argument('--learning_rate', type=float, default=5e-4, help='optimizer learning rate')
     parser.add_argument('--weight_decay', type=float, default=0.0, help='optimizer weight decay')
     parser.add_argument('--max_norm', type=float, default=5.0, help='max norm of grad')
+    parser.add_argument('--use_scheduler', action='store_true', default=False, help='use scheduler or not')
 
     # GPU
     parser.add_argument('--use_gpu', type=bool, default=True, help='use gpu')

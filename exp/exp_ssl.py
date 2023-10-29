@@ -102,8 +102,7 @@ class Exp_SSL(Exp_Basic):
                     y_pred = self.model(x, y, supports, None)
                     loss = criterion(y, y_pred).cpu()
                 elif self.args.model in ['VQ_BERT']:
-                    inputs = torch.cat([x, y], dim=-1)
-                    pred, label = self.model(inputs)
+                    pred, label = self.model(x)
                     loss = criterion(pred, label).cpu()
                 else:
                     raise NotImplementedError
@@ -192,8 +191,7 @@ class Exp_SSL(Exp_Basic):
                         seq_pred = self.model(x, y, supports, self.steps)
                         loss = self.criterion(y, seq_pred).to(self.device)
                     elif self.args.model in ['VQ_BERT']:
-                        inputs = torch.cat([x, y], dim=-1)
-                        pred, label = self.model(inputs)
+                        pred, label = self.model(x)
                         loss = self.criterion(pred, label).to(self.device)
                     else:
                         raise NotImplementedError
@@ -211,15 +209,15 @@ class Exp_SSL(Exp_Basic):
                     self.logging.add_scalar('train/loss', loss_val, self.steps)
                     self.logging.add_scalar('train/lr', model_optim.param_groups[0]['lr'], self.steps)
 
-            saver.save(epoch, self.model, model_optim, loss_val)
-
-            if (epoch+1) % self.args.eval_every == 0 and self.args.if_eval:
+            if (epoch+1) % self.args.eval_every == 0:
                 vali_loss = self.vali(vali_loader, self.criterion)
                 self.logging.add_scalar('vali/loss', vali_loss, epoch)
+                saver.save(epoch, self.model, model_optim, vali_loss)
                 early_stopping(vali_loss)
                 if early_stopping.early_stop:
                     break
-            scheduler.step()
+            if self.args.use_scheduler:
+                scheduler.step()
         return
 
     def test(self, model_file:str='best.pth.tar', model_dir:str=None):
@@ -228,7 +226,7 @@ class Exp_SSL(Exp_Basic):
             path = os.path.join(self.logging_dir, 'checkpoint', model_file)
         else:
             path = os.path.join(model_dir, model_file)
-        load_model_checkpoint(path, self.model, map_location=self.device)
+        load_model_checkpoint(path, self.model, map_location=self.device, if_strict=True)
 
         criterion = self._select_criterion()
 
@@ -263,8 +261,7 @@ class Exp_SSL(Exp_Basic):
                     y_pred = self.model(x, y, supports, None)
                     loss = criterion(y, y_pred).cpu()
                 elif self.args.model in ['VQ_BERT']:
-                    inputs = torch.cat([x, y], dim=-1)
-                    pred, label = self.model(inputs)
+                    pred, label = self.model(x)
                     loss = criterion(pred, label).cpu()
                 else:
                     raise NotImplementedError

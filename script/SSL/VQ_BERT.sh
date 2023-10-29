@@ -11,12 +11,15 @@ torchrun \
     --mask_length 10 \
     --mask_ratio 0.2 \
     --codebook_num 4 \
-    --num_embedding 1024 \
-    --kernel_size 5 \
+    --codebook_item 1024 \
+    --kernel_size 3 \
     --attn_head 8 \
     --e_layers 4 \
+    --d_model 512 \
     --d_hidden 64 \
-    --d_model 128 \
     --train_batch_size 64 \
     --test_batch_size 64 \
-    --dropout 0.2
+    --dropout 0.1 \
+    --min_space 1 \
+    --mask_dropout 0.0 \
+    --enc_type "rel"

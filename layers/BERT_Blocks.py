@@ -13,7 +13,8 @@ class ConformerEncoderLayer(torch.nn.Module):
         ffn_embed_dim,
         attention_heads,
         dropout,
-        depthwise_conv_kernel_size=31,
+        depthwise_conv_kernel_size,
+        enc_type,
     ):
         """
         Args:
@@ -24,6 +25,7 @@ class ConformerEncoderLayer(torch.nn.Module):
             depthwise_conv_kernel_size: Size of kernel in depthwise conv layer in convolution module
         """
         super(ConformerEncoderLayer, self).__init__()
+        self.enc_type = enc_type
 
         self.ffn1 = PositionwiseFeedForward(
             embed_dim,
@@ -33,11 +35,21 @@ class ConformerEncoderLayer(torch.nn.Module):
 
         self.self_attn_layer_norm = nn.LayerNorm(embed_dim)
         self.self_attn_dropout = torch.nn.Dropout(dropout)
-        self.self_attn = MultiHeadedAttention(
-            embed_dim,
-            attention_heads,
-            dropout=dropout,
-        )
+
+        if enc_type == 'abs':
+            self.self_attn = MultiHeadedAttention(
+                embed_dim,
+                attention_heads,
+                dropout=dropout,
+            )
+        elif enc_type == 'rel':
+            self.self_attn = RelPositionMultiHeadedAttention(
+                n_feat=embed_dim,
+                n_head=attention_heads,
+                dropout=dropout,
+            )
+        else:
+            raise ValueError('unknown positional encoding type: {}'.format(enc_type))
 
         self.conv_module = ConvolutionModule(
             embed_dim=embed_dim,
@@ -57,30 +69,42 @@ class ConformerEncoderLayer(torch.nn.Module):
         self,
         x,
         encoder_padding_mask: Optional[torch.Tensor],
+        pos_emb: Optional[torch.Tensor],
     ):
         """
         Args:
-            x: Tensor of shape B x nvar x T x d_model
+            x: Tensor of shape B x T x d_model
             encoder_padding_mask: Optional mask tensor
+            pos_emb: Positional embedding tensor of shape B x 2T-1 x d_model
         Returns:
-            Tensor of shape B x nvar x T x d_model
+            Tensor of shape B x T x d_model
         """
         residual = x 
         x = self.ffn1(x) 
         x = x * 0.5 + residual 
         residual = x 
         x = self.self_attn_layer_norm(x) 
-        x = self.self_attn(
-            query=x.view(-1, *(x.shape[-2:])),
-            key=x.view(-1, *(x.shape[-2:])),
-            value=x.view(-1, *(x.shape[-2:])),
-            key_padding_mask=encoder_padding_mask,
-        ).view_as(residual)
+
+        if self.enc_type == 'abs':
+            x = self.self_attn(
+                query=x,
+                key=x,
+                value=x,
+                key_padding_mask=encoder_padding_mask,
+            )
+        elif self.enc_type == 'rel':
+            x = self.self_attn(
+                query=x,
+                key=x,
+                value=x,
+                pos_emb=pos_emb,
+                key_padding_mask=encoder_padding_mask,
+            )
         x = self.self_attn_dropout(x)
         x = x + residual 
 
         residual = x
-        x = self.conv_module(x.view(-1, *(x.shape[-2:]))).view_as(residual)
+        x = self.conv_module(x)
         x = residual + x
 
         residual = x
@@ -267,6 +291,96 @@ class MultiHeadedAttention(nn.Module):
 
         q, k, v = self.forward_qkv(query, key, value)
         scores = torch.matmul(q, k.transpose(-2, -1)) / math.sqrt(self.d_k)
+        scores = self.forward_attention(v, scores, key_padding_mask)
+        scores = scores.transpose(0, 1)
+        return scores
+    
+
+class RelPositionMultiHeadedAttention(MultiHeadedAttention):
+    """Multi-Head Attention layer with relative position encoding.
+    Paper: https://arxiv.org/abs/1901.02860
+    Args:
+        n_head: The number of heads.
+        n_feat: The number of features.
+        dropout: Dropout rate.
+        zero_triu: Whether to zero the upper triangular part of attention matrix.
+    """
+
+    def __init__(self, n_feat, n_head, dropout, zero_triu=False):
+        """Construct an RelPositionMultiHeadedAttention object."""
+        super().__init__(n_feat, n_head, dropout)
+        self.zero_triu = zero_triu
+        # linear transformation for positional encoding
+        self.linear_pos = nn.Linear(n_feat, n_feat, bias=False)
+        # these two learnable bias are used in matrix c and matrix d
+        # as described in https://arxiv.org/abs/1901.02860 Section 3.3
+        self.pos_bias_u = nn.Parameter(torch.zeros(self.h, self.d_k))
+        self.pos_bias_v = nn.Parameter(torch.zeros(self.h, self.d_k))
+        torch.nn.init.xavier_uniform_(self.pos_bias_u)
+        torch.nn.init.xavier_uniform_(self.pos_bias_v)
+
+    def rel_shift(self, x):
+        """Compute relative positional encoding.
+        Args:
+            x: Input tensor B X n_head X T X 2T-1
+        Returns:
+            torch.Tensor: Output tensor.
+        """
+        zero_pad = torch.zeros((*x.size()[:3], 1), device=x.device, dtype=x.dtype)
+        x_padded = torch.cat([zero_pad, x], dim=-1)
+
+        x_padded = x_padded.view(*x.size()[:2], x.size(3) + 1, x.size(2))
+        x = x_padded[:, :, 1:].view_as(x)[
+            :, :, :, : x.size(-1) // 2 + 1
+        ]  # only keep the positions from 0 to time2
+
+        if self.zero_triu:
+            ones = torch.ones((x.size(2), x.size(3)), device=x.device)
+            x = x * torch.tril(ones, x.size(3) - x.size(2))[None, None, :, :]
+
+        return x
+
+    def forward(self, query, key, value, pos_emb, key_padding_mask=None, **kwargs):
+        """Compute scaled dot product attention.
+        Args:
+            query: Query tensor T X B X C
+            key: Key tensor T X B X C
+            value: Value tensor T X B X C
+            pos_emb: Positional embedding tensor B X 2T-1 X C
+            key_padding_mask: Mask tensor T X B
+        Returns:
+            torch.Tensor: Output tensor T X B X C.
+        """
+        query = query.transpose(0, 1)
+        key = key.transpose(0, 1)
+        value = value.transpose(0, 1)
+        pos_emb = pos_emb.transpose(0, 1)
+        q, k, v = self.forward_qkv(query, key, value)
+        q = q.transpose(1, 2)  # (batch, time1, head, d_k)
+        n_batch_pos = pos_emb.size(0)
+        p = self.linear_pos(pos_emb).view(n_batch_pos, -1, self.h, self.d_k)
+        p = p.transpose(1, 2)  # (batch, head, 2*time1-1, d_k)
+
+        # (batch, head, time1, d_k)
+        q_with_bias_u = (q + self.pos_bias_u).transpose(1, 2)
+        # (batch, head, time1, d_k)
+        q_with_bias_v = (q + self.pos_bias_v).transpose(1, 2)
+
+        # compute attention score
+        # first compute matrix a and matrix c
+        # as described in https://arxiv.org/abs/1901.02860 Section 3.3
+        # (batch, head, time1, time2)
+        matrix_ac = torch.matmul(q_with_bias_u, k.transpose(-2, -1))
+
+        # compute matrix b and matrix d
+        # (batch, head, time1, 2*time1-1)
+        matrix_bd = torch.matmul(q_with_bias_v, p.transpose(-2, -1))
+        matrix_bd = self.rel_shift(matrix_bd)
+
+        scores = (matrix_ac + matrix_bd) / math.sqrt(
+            self.d_k
+        )  # (batch, head, time1, time2)
+
         scores = self.forward_attention(v, scores, key_padding_mask)
         scores = scores.transpose(0, 1)
         return scores

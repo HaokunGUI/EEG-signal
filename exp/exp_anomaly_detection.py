@@ -230,10 +230,11 @@ class Exp_Anomaly_Detection(Exp_Basic):
                 self.logging.add_scalar('vali/auroc', vali_metrics['auroc'], epoch)
                 saver.save(epoch, self.model, model_optim, vali_metrics['auroc'])
                 early_stopping(vali_metrics['auroc'])
-
                 if early_stopping.early_stop:
                     break
-            # scheduler.step()
+            
+            if self.args.use_scheduler:
+                scheduler.step()
         return
 
     def test(self, model_file:str='best.pth.tar', model_dir:str=None):
@@ -243,7 +244,7 @@ class Exp_Anomaly_Detection(Exp_Basic):
         else:
             path_dir = model_dir
         path = os.path.join(path_dir, model_file)
-        load_model_checkpoint(path, self.model, map_location=self.device)
+        load_model_checkpoint(path, self.model, map_location=self.device, if_strict=True)
 
         self.model.eval()
         y_trues = []

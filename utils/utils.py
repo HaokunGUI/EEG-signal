@@ -73,13 +73,13 @@ class CheckpointSaver:
             shutil.copy(checkpoint_path, best_path)
 
 
-def load_model_checkpoint(checkpoint_file, model, optimizer=None, map_location=None):
+def load_model_checkpoint(checkpoint_file, model, optimizer=None, map_location=None, if_strict=False):
     if map_location is not None:
         loc = f'cuda:{map_location}'
         checkpoint = torch.load(checkpoint_file, map_location=loc)
     else:
         checkpoint = torch.load(checkpoint_file)
-    model.load_state_dict(checkpoint['model_state'], strict=False)
+    model.load_state_dict(checkpoint['model_state'], strict=if_strict)
     if optimizer is not None:
         optimizer.load_state_dict(checkpoint['optimizer_state'])
         return model, optimizer
