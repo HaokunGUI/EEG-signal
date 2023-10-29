@@ -82,10 +82,10 @@ class VQ_BERT(nn.Module):
         token = self.tokenizer(x) # [batchsize, patch_num, embedding_dim]
         B, T, D = token.shape
 
-        # quantize the input
-        quant_idx = self.quantize(token) # [batchsize, patch_num, codebook_num]
-
         if self.task_name == 'ssl':
+            # quantize the input
+            quant_idx = self.quantize(token) # [batchsize, patch_num, codebook_num]
+            
             mask = compute_mask_indices((B, T),
                                 None,
                                 mask_prob=self.mask_ratio, 
