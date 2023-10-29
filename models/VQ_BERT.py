@@ -85,16 +85,15 @@ class VQ_BERT(nn.Module):
         # quantize the input
         quant_idx = self.quantize(token) # [batchsize, patch_num, codebook_num]
 
-        if self.training:
-            # create random masking
+        if self.task_name == 'ssl':
             mask = compute_mask_indices((B, T),
-                                    None,
-                                    mask_prob=self.mask_ratio, 
-                                    mask_length=self.mask_length, 
-                                    no_overlap=self.no_overlap,
-                                    min_space=self.min_space,
-                                    mask_dropout=self.mask_dropout,
-                                    ) #[bs, T]
+                                None,
+                                mask_prob=self.mask_ratio, 
+                                mask_length=self.mask_length, 
+                                no_overlap=self.no_overlap,
+                                min_space=self.min_space,
+                                mask_dropout=self.mask_dropout,
+                            ) #[bs, T]
             mask = torch.from_numpy(mask).to(x.device)
             masked_num = mask.sum() #[bs]
             random_sample = torch.normal(mean=0, std=0.1, size=(masked_num, D)).to(x.device) #[bs, masked_num, D]
