@@ -7,7 +7,7 @@ torchrun \
     --learning_rate 1e-3 \
     --normalize \
     --patience 0 \
-    --num_epochs 300 \
+    --num_epochs 100 \
     --mask_length 10 \
     --mask_ratio 0.2 \
     --codebook_num 4 \
@@ -22,4 +22,5 @@ torchrun \
     --dropout 0.1 \
     --min_space 1 \
     --mask_dropout 0.0 \
-    --enc_type "rel"
+    --enc_type "rel" \
+    --last_train_path "/home/guihaokun/Time-Series-Pretrain/logging/ssl/VQ_BERT/VQ_BERT_231031_021144/checkpoint/last.pth.tar"

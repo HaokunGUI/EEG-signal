@@ -133,6 +133,11 @@ class Exp_SSL(Exp_Basic):
         scheduler = self._select_scheduler(model_optim)
         saver = CheckpointSaver(checkpoint_dir, metric_name=self.args.loss_fn,
                                   maximize_metric=False)
+        
+        if self.args.continue_train:
+            if self.device == 0:
+                print('continue train')
+            self.model, model_optim = load_model_checkpoint(self.args.last_train_path, self.model, model_optim, map_location=self.device)
 
         self.steps = 0
         for epoch in range(self.args.num_epochs): 

@@ -50,6 +50,7 @@ if __name__ == '__main__':
                         help='model name, options: [DCRNN, TimesNet]')
     parser.add_argument('--log_dir', type=str, default='/home/guihaokun/Time-Series-Pretrain/logging', help='log dir')
     parser.add_argument('--seed', type=int, default=1029, help='random seed')
+    parser.add_argument('--last_train_path', type=str, default=None, help='last train model path')
 
     # data loader
     parser.add_argument('--dataset', type=str, default='TUSZ', help='dataset type, options:[TUSZ]')
@@ -125,7 +126,6 @@ if __name__ == '__main__':
     parser.add_argument('--adj_every', type=int, default=10, help='display adj matrix every X epochs')
 
     # pretrain
-    parser.add_argument('--use_pretrained', action='store_true', default=False, help='pretrain or not')
     parser.add_argument('--pretrained_path', type=str, default=None, help='pretrain model path')
 
     args = parser.parse_args()
@@ -156,4 +156,14 @@ if __name__ == '__main__':
         args.input_dim = args.input_dim // 2
         args.output_dim = args.output_dim // 2
     
+    if args.pretrained_path is not None:
+        args.use_pretrained = True
+    else:
+        args.use_pretrained = False
+
+    if args.last_train_path is not None:
+        args.continue_train = True
+    else:
+        args.continue_train = False
+
     main(args)
