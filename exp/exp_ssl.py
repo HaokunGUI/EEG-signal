@@ -56,7 +56,10 @@ class Exp_SSL(Exp_Basic):
         return data_set, data_loader
 
     def _select_optimizer(self):
-        model_optim = optim.Adam(self.model.parameters(), lr=self.args.learning_rate, weight_decay=self.args.weight_decay)
+        if self.args.model in ['DCRNN']:
+            model_optim = optim.Adam(self.model.parameters(), lr=self.args.learning_rate, weight_decay=self.args.weight_decay)
+        elif self.args.model in ['VQ_BERT']:
+            model_optim = optim.AdamW(self.model.parameters(), lr=self.args.learning_rate, weight_decay=self.args.weight_decay)
         return model_optim
 
     def _select_criterion(self):
@@ -100,10 +103,10 @@ class Exp_SSL(Exp_Basic):
 
                 if self.args.model in ['DCRNN']:
                     y_pred = self.model(x, y, supports, None)
-                    loss = criterion(y, y_pred).cpu()
+                    loss = criterion(y, y_pred)
                 elif self.args.model in ['VQ_BERT']:
                     pred, label = self.model(x)
-                    loss = criterion(pred, label).cpu()
+                    loss = criterion(pred, label)
                 else:
                     raise NotImplementedError
                 loss_val = loss.item()
@@ -264,10 +267,10 @@ class Exp_SSL(Exp_Basic):
 
                 if self.args.model in ['DCRNN']:
                     y_pred = self.model(x, y, supports, None)
-                    loss = criterion(y, y_pred).cpu()
+                    loss = criterion(y, y_pred)
                 elif self.args.model in ['VQ_BERT']:
                     pred, label = self.model(x)
-                    loss = criterion(pred, label).cpu()
+                    loss = criterion(pred, label)
                 else:
                     raise NotImplementedError
                 

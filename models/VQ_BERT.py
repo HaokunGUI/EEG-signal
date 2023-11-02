@@ -16,7 +16,7 @@ class VQ_BERT(nn.Module):
     def __init__(self, in_channel:int, patch_size:int, patch_num:int, d_model:int, n_layers: int, 
                  attn_heads:int, codebook_item: int, vq_dim: int, codebook_num: int, dropout=0.1, 
                  mask_ratio=0.2, conv_kernel_size=5, task_name='ssl', mask_length=10, no_overlap=False, 
-                 min_space=1, mask_dropout=0.0, enc_type='rel'):
+                 min_space=1, mask_dropout=0.0, enc_type='rel', mask_type='static'):
         """
         :param vocab_size: vocab_size of total words
         :param d_model: BERT model hidden size
@@ -40,6 +40,7 @@ class VQ_BERT(nn.Module):
         self.codebook_num = codebook_num
         self.codebook_item = codebook_item
         self.enc_type = enc_type
+        self.mask_type = mask_type
 
         self.tokenizer = Tokenizer(in_channel=in_channel, patch_size=patch_size, 
                                    embedding_dim=d_model)
@@ -92,6 +93,7 @@ class VQ_BERT(nn.Module):
                                 mask_length=self.mask_length, 
                                 no_overlap=self.no_overlap,
                                 min_space=self.min_space,
+                                mask_type=self.mask_type,
                                 mask_dropout=self.mask_dropout,
                             ) #[bs, T]
             mask = torch.from_numpy(mask).to(x.device)
@@ -148,6 +150,7 @@ class Model(nn.Module):
             min_space=args.min_space,
             mask_dropout=args.mask_dropout,
             enc_type=args.enc_type,
+            mask_type=args.mask_type,
         )
 
     def forward(self, x:torch.Tensor):

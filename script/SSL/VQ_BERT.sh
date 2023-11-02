@@ -7,20 +7,22 @@ torchrun \
     --learning_rate 1e-3 \
     --normalize \
     --patience 0 \
-    --num_epochs 100 \
-    --mask_length 10 \
-    --mask_ratio 0.2 \
+    --num_epochs 400 \
+    --mask_length 4 \
+    --mask_ratio 0.15 \
     --codebook_num 4 \
     --codebook_item 1024 \
-    --kernel_size 3 \
+    --kernel_size 5 \
     --attn_head 8 \
     --e_layers 4 \
     --d_model 512 \
-    --d_hidden 64 \
+    --d_hidden 128 \
     --train_batch_size 64 \
     --test_batch_size 64 \
-    --dropout 0.1 \
+    --dropout 0.3 \
     --min_space 1 \
     --mask_dropout 0.0 \
+    --num_workers 8 \
     --enc_type "rel" \
-    --last_train_path "/home/guihaokun/Time-Series-Pretrain/logging/ssl/VQ_BERT/VQ_BERT_231031_021144/checkpoint/last.pth.tar"
+    --mask_type "poisson" \
+    --last_train_path "/home/guihaokun/Time-Series-Pretrain/logging/ssl/VQ_BERT/VQ_BERT_231102_020307/checkpoint/last.pth.tar"

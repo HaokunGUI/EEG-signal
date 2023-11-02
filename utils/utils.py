@@ -206,7 +206,7 @@ def compute_mask_indices(
             lengths = [max(1, int(round(x))) for x in lengths]
         elif mask_type == "poisson":
             lengths = rng.poisson(mask_length, size=num_mask)
-            lengths = [int(round(x)) for x in lengths]
+            lengths = [max(1, int(round(x))) for x in lengths]
         else:
             raise Exception("unknown mask selection " + mask_type)
 

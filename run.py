@@ -109,6 +109,7 @@ if __name__ == '__main__':
     parser.add_argument('--no_overlap', action='store_true', default=False, help='mask overlap or not')
     parser.add_argument('--min_space', type=int, default=1, help='min space between mask')
     parser.add_argument('--mask_dropout', type=float, default=0.0, help='mask dropout ratio')
+    parser.add_argument('--mask_type', type=str, default='poisson', help='mask type, options:[static, uniform, normal, poisson]')
 
     # optimization
     parser.add_argument('--num_epochs', type=int, default=60, help='train epochs')
