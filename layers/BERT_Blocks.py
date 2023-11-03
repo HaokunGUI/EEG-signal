@@ -187,7 +187,7 @@ class ConvolutionModule(torch.nn.Module):
             bias=bias,
         )
         self.dropout = torch.nn.Dropout(dropout)
-        self.batch_norm = nn.BatchNorm1d(embed_dim)
+        self.layer_norm_2 = nn.LayerNorm(embed_dim)
 
     def forward(self, x):
         """
@@ -206,7 +206,7 @@ class ConvolutionModule(torch.nn.Module):
 
         # 1D Depthwise Conv
         x = self.depthwise_conv(x)
-        x = self.batch_norm(x)
+        x = self.layer_norm_2(x)
         x = self.activation(x)
 
         x = self.pointwise_conv2(x)

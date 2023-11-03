@@ -32,7 +32,6 @@ class Exp_SSL(Exp_Basic):
         model = self.model_dict[self.args.model].Model(self.args).cuda()
         if self.args.use_gpu:
             model = DDP(model, device_ids=[self.device], find_unused_parameters=True)
-            model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
         return model
     
     def _get_scalar(self):
@@ -152,6 +151,7 @@ class Exp_SSL(Exp_Basic):
             with tqdm(train_loader.dataset, desc=f'Epoch: {epoch + 1} / {self.args.num_epochs}', \
                                               disable=(self.device != 0)) as progress_bar:
                 for x, y, augment in train_loader:
+                    train_loader.sampler.set_epoch(epoch)
                     model_optim.zero_grad()
 
                     batch_size = x.size(0)

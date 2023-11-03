@@ -22,5 +22,6 @@ torchrun \
     --dropout 0.3 \
     --min_space 1 \
     --mask_dropout 0.0 \
+    --num_workers 8 \
     --enc_type "rel" \
     --mask_type "poisson"

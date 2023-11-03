@@ -35,7 +35,6 @@ class Exp_Anomaly_Detection(Exp_Basic):
         model = self.model_dict[self.args.model].Model(self.args).cuda()
         if self.args.use_gpu:
             model = DDP(model, device_ids=[self.device], find_unused_parameters=True)
-            model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
         if self.args.use_pretrained:
             load_model_checkpoint(self.args.pretrained_path, model, map_location=self.device)
         return model
