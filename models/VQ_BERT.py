@@ -120,8 +120,7 @@ class VQ_BERT(nn.Module):
             quant_mask = quant_idx[mask] # [masked_num, codebook_num]
             return possibility.view(-1, self.codebook_item), quant_mask.view(-1)
         elif self.task_name == 'anomaly_detection':
-            flatten = nn.Flatten(start_dim=-2)
-            xm = flatten(xm)
+            xm = xm.reshape(B, -1)
             xm = self.dropout(xm)
             xm = self.final_projector(xm)
             return xm

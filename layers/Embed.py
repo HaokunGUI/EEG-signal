@@ -147,16 +147,14 @@ class RelPositionalEncoding(nn.Module):
     def forward(self, x: torch.Tensor):
         """Add positional encoding.
         Args:
-            x : Input tensor T X B X C.
+            x : Input tensor B x T x C.
         Returns:
-            torch.Tensor: Encoded tensor T X B X C.
+            torch.Tensor: Encoded tensor B x T x C.
 
         """
-        x = x.transpose(0, 1)  # Change TBC to BTC
         self.extend_pe(x)
         pos_emb = self.pe[
             :,
             self.pe.size(1) // 2 - x.size(1) + 1 : self.pe.size(1) // 2 + x.size(1),
         ]
-        pos_emb = pos_emb.transpose(0, 1)  # change to TBC
         return pos_emb

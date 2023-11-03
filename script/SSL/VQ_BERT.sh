@@ -1,14 +1,14 @@
 torchrun \
     --standalone \
-    --nproc_per_node=4 \
+    --nproc_per_node=3 \
     run.py \
     --task_name ssl \
     --model VQ_BERT \
-    --learning_rate 1e-3 \
+    --learning_rate 1e-2 \
     --normalize \
     --patience 0 \
     --num_epochs 400 \
-    --mask_length 4 \
+    --mask_length 3 \
     --mask_ratio 0.15 \
     --codebook_num 4 \
     --codebook_item 1024 \
@@ -22,7 +22,5 @@ torchrun \
     --dropout 0.3 \
     --min_space 1 \
     --mask_dropout 0.0 \
-    --num_workers 8 \
     --enc_type "rel" \
-    --mask_type "poisson" \
-    --last_train_path "/home/guihaokun/Time-Series-Pretrain/logging/ssl/VQ_BERT/VQ_BERT_231102_020307/checkpoint/last.pth.tar"
+    --mask_type "poisson"

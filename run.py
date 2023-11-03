@@ -7,7 +7,7 @@ import torch.multiprocessing
 from utils.tools import ddp_setup, ddp_cleanup, seed_torch
 import os
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2,3"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1,2,3"
 
 def main(args: argparse.Namespace):
     seed_torch(args.seed)
@@ -116,7 +116,7 @@ if __name__ == '__main__':
     parser.add_argument('--patience', type=int, default=5, help='early stopping patience')
     parser.add_argument('--learning_rate', type=float, default=5e-4, help='optimizer learning rate')
     parser.add_argument('--weight_decay', type=float, default=0.0, help='optimizer weight decay')
-    parser.add_argument('--max_norm', type=float, default=5.0, help='max norm of grad')
+    parser.add_argument('--max_norm', type=float, default=1.0, help='max norm of grad')
     parser.add_argument('--use_scheduler', action='store_true', default=False, help='use scheduler or not')
 
     # GPU

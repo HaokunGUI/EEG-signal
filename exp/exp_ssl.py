@@ -17,6 +17,7 @@ from utils.tools import *
 from utils.visualize import *
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from utils.constants import *
+import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
 import os
 
@@ -31,6 +32,7 @@ class Exp_SSL(Exp_Basic):
         model = self.model_dict[self.args.model].Model(self.args).cuda()
         if self.args.use_gpu:
             model = DDP(model, device_ids=[self.device], find_unused_parameters=True)
+            model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
         return model
     
     def _get_scalar(self):
@@ -59,7 +61,7 @@ class Exp_SSL(Exp_Basic):
         if self.args.model in ['DCRNN']:
             model_optim = optim.Adam(self.model.parameters(), lr=self.args.learning_rate, weight_decay=self.args.weight_decay)
         elif self.args.model in ['VQ_BERT']:
-            model_optim = optim.AdamW(self.model.parameters(), lr=self.args.learning_rate, weight_decay=self.args.weight_decay)
+            model_optim = optim.Adam(self.model.parameters(), lr=self.args.learning_rate, weight_decay=self.args.weight_decay)
         return model_optim
 
     def _select_criterion(self):
@@ -278,5 +280,9 @@ class Exp_SSL(Exp_Basic):
                 losses.append(loss_val)
 
             loss = np.average(losses)
+            dist.barrier()
+            dist.all_reduce(loss, op=dist.ReduceOp.SUM)
+            loss = loss / self.world_size
+
         self.logging.add_scalar('test/loss', loss)
         return

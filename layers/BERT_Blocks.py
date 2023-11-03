@@ -122,10 +122,17 @@ class PositionwiseFeedForward(nn.Module):
         super(PositionwiseFeedForward, self).__init__()
         self.w_1 = nn.Linear(d_model, d_ff)
         self.w_2 = nn.Linear(d_ff, d_model)
+        self.ln = nn.LayerNorm(d_model)
         self.dropout = nn.Dropout(dropout)
         self.activation = nn.GELU()
     def forward(self, x):
-        return self.dropout(self.w_2(self.dropout(self.activation(self.w_1(x)))))
+        x = self.ln(x)
+        x = self.w_1(x)
+        x = self.activation(x)
+        x = self.dropout(x)
+        x = self.w_2(x)
+        x = self.dropout(x)
+        return x
 
 
 class ConvolutionModule(torch.nn.Module):
@@ -180,6 +187,7 @@ class ConvolutionModule(torch.nn.Module):
             bias=bias,
         )
         self.dropout = torch.nn.Dropout(dropout)
+        self.batch_norm = nn.BatchNorm1d(embed_dim)
 
     def forward(self, x):
         """
@@ -198,6 +206,7 @@ class ConvolutionModule(torch.nn.Module):
 
         # 1D Depthwise Conv
         x = self.depthwise_conv(x)
+        x = self.batch_norm(x)
         x = self.activation(x)
 
         x = self.pointwise_conv2(x)
@@ -278,21 +287,16 @@ class MultiHeadedAttention(nn.Module):
     def forward(self, query, key, value, key_padding_mask=None, **kwargs):
         """Compute scaled dot product attention.
         Args:
-            query (torch.Tensor): Query tensor T X B X C
-            key (torch.Tensor): Key tensor T X B X C
-            value (torch.Tensor): Value tensor T X B X C
-            mask (torch.Tensor): Mask tensor T X B
+            query (torch.Tensor): Query tensor B X T X C
+            key (torch.Tensor): Key tensor B X T X C
+            value (torch.Tensor): Value tensor B X T X C
+            mask (torch.Tensor): Mask tensor B X T
         Returns:
-            torch.Tensor: Output tensor T X B X D.
+            torch.Tensor: Output tensor B X T X D.
         """
-        query = query.transpose(0, 1)
-        key = key.transpose(0, 1)
-        value = value.transpose(0, 1)
-
         q, k, v = self.forward_qkv(query, key, value)
         scores = torch.matmul(q, k.transpose(-2, -1)) / math.sqrt(self.d_k)
         scores = self.forward_attention(v, scores, key_padding_mask)
-        scores = scores.transpose(0, 1)
         return scores
     
 
@@ -343,18 +347,14 @@ class RelPositionMultiHeadedAttention(MultiHeadedAttention):
     def forward(self, query, key, value, pos_emb, key_padding_mask=None, **kwargs):
         """Compute scaled dot product attention.
         Args:
-            query: Query tensor T X B X C
-            key: Key tensor T X B X C
-            value: Value tensor T X B X C
+            query: Query tensor B X T X C
+            key: Key tensor B X T X C
+            value: Value tensor B X T X C
             pos_emb: Positional embedding tensor B X 2T-1 X C
-            key_padding_mask: Mask tensor T X B
+            key_padding_mask: Mask tensor B X T
         Returns:
-            torch.Tensor: Output tensor T X B X C.
+            torch.Tensor: Output tensor B X T X C.
         """
-        query = query.transpose(0, 1)
-        key = key.transpose(0, 1)
-        value = value.transpose(0, 1)
-        pos_emb = pos_emb.transpose(0, 1)
         q, k, v = self.forward_qkv(query, key, value)
         q = q.transpose(1, 2)  # (batch, time1, head, d_k)
         n_batch_pos = pos_emb.size(0)
@@ -382,5 +382,4 @@ class RelPositionMultiHeadedAttention(MultiHeadedAttention):
         )  # (batch, head, time1, time2)
 
         scores = self.forward_attention(v, scores, key_padding_mask)
-        scores = scores.transpose(0, 1)
         return scores
