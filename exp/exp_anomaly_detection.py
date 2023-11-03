@@ -155,6 +155,7 @@ class Exp_Anomaly_Detection(Exp_Basic):
             with tqdm(train_loader.dataset, desc=f'Epoch: {epoch + 1} / {self.args.num_epochs}', \
                                               disable=(self.device != 0)) as progress_bar:
                 for x, y, augment in train_loader:
+                    train_loader.sampler.set_epoch(epoch)
                     model_optim.zero_grad()
 
                     batch_size = x.size(0)
