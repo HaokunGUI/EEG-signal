@@ -7,7 +7,7 @@ import torch.multiprocessing
 from utils.tools import ddp_setup, ddp_cleanup, seed_torch
 import os
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "1,2,3"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2,3"
 
 def main(args: argparse.Namespace):
     seed_torch(args.seed)

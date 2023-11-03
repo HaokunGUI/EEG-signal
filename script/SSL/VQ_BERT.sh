@@ -1,10 +1,10 @@
 torchrun \
     --standalone \
-    --nproc_per_node=3 \
+    --nproc_per_node=4 \
     run.py \
     --task_name ssl \
     --model VQ_BERT \
-    --learning_rate 1e-2 \
+    --learning_rate 5e-3 \
     --normalize \
     --patience 0 \
     --num_epochs 400 \
