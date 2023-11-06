@@ -17,8 +17,8 @@ torchrun \
     --e_layers 4 \
     --d_model 512 \
     --d_hidden 128 \
-    --train_batch_size 32 \
-    --test_batch_size 32 \
+    --train_batch_size 64 \
+    --test_batch_size 64 \
     --dropout 0.3 \
     --min_space 1 \
     --mask_dropout 0.0 \

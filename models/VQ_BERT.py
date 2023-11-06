@@ -42,7 +42,7 @@ class VQ_BERT(nn.Module):
         self.codebook_item = codebook_item
         self.enc_type = enc_type
         self.mask_type = mask_type
-        self.RevIN = RevIN(d_model)
+        self.IN = nn.InstanceNorm1d(in_channel)
 
         self.tokenizer = Tokenizer(in_channel=in_channel, patch_size=patch_size, 
                                    embedding_dim=d_model)
@@ -81,9 +81,10 @@ class VQ_BERT(nn.Module):
         # attention masking for padded token
         # x:[batch_size, seq_len, in_channel]
 
+        # normalize the input
+        x = self.IN(x.permute(0, 2, 1)).permute(0, 2, 1) # [batchsize, seq_len, in_channel]
         # tokenize the input 
         token = self.tokenizer(x) # [batchsize, patch_num, embedding_dim]
-        token = self.RevIN(token, mode='norm')
         B, T, D = token.shape
 
         if self.task_name == 'ssl':
@@ -113,8 +114,6 @@ class VQ_BERT(nn.Module):
         elif self.enc_type == 'rel':
             for transformer in self.transformer_blocks:
                 xm = transformer.forward(token, None, self.positional_encoding(token))
-        
-        xm = self.RevIN(xm, mode='denorm')
         
         if self.task_name == 'ssl':
             mask_xm = xm[mask] #[masked_num, embedding_dim]
