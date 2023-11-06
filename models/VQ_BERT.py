@@ -6,6 +6,7 @@ from utils.utils import compute_mask_indices
 from layers.BERT_Blocks import ConformerEncoderLayer
 from layers.Embed import PositionalEmbedding, Tokenizer, RelPositionalEncoding
 from layers.Quantize import Quantize
+from layers.Normalize import RevIN
 import argparse
 
 class VQ_BERT(nn.Module):
@@ -41,6 +42,7 @@ class VQ_BERT(nn.Module):
         self.codebook_item = codebook_item
         self.enc_type = enc_type
         self.mask_type = mask_type
+        self.RevIN = RevIN(d_model)
 
         self.tokenizer = Tokenizer(in_channel=in_channel, patch_size=patch_size, 
                                    embedding_dim=d_model)
@@ -81,6 +83,7 @@ class VQ_BERT(nn.Module):
 
         # tokenize the input 
         token = self.tokenizer(x) # [batchsize, patch_num, embedding_dim]
+        token = self.RevIN(token, mode='norm')
         B, T, D = token.shape
 
         if self.task_name == 'ssl':
@@ -110,6 +113,8 @@ class VQ_BERT(nn.Module):
         elif self.enc_type == 'rel':
             for transformer in self.transformer_blocks:
                 xm = transformer.forward(token, None, self.positional_encoding(token))
+        
+        xm = self.RevIN(xm, mode='denorm')
         
         if self.task_name == 'ssl':
             mask_xm = xm[mask] #[masked_num, embedding_dim]

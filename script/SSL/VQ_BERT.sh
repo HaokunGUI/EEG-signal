@@ -1,13 +1,13 @@
 torchrun \
     --standalone \
-    --nproc_per_node=4 \
+    --nproc_per_node=3 \
     run.py \
     --task_name ssl \
     --model VQ_BERT \
-    --learning_rate 5e-3 \
+    --learning_rate 1e-2 \
     --normalize \
     --patience 0 \
-    --num_epochs 400 \
+    --num_epochs 300 \
     --mask_length 3 \
     --mask_ratio 0.15 \
     --codebook_num 4 \
@@ -17,8 +17,8 @@ torchrun \
     --e_layers 4 \
     --d_model 512 \
     --d_hidden 128 \
-    --train_batch_size 64 \
-    --test_batch_size 64 \
+    --train_batch_size 32 \
+    --test_batch_size 32 \
     --dropout 0.3 \
     --min_space 1 \
     --mask_dropout 0.0 \

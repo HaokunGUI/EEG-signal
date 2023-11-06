@@ -276,11 +276,10 @@ class Exp_SSL(Exp_Basic):
                 else:
                     raise NotImplementedError
                 
-                loss_val = loss.item()
+                loss_val = loss
                 losses.append(loss_val)
 
-            loss = np.average(losses)
-            dist.barrier()
+            loss = torch.mean(torch.stack(losses))
             dist.all_reduce(loss, op=dist.ReduceOp.SUM)
             loss = loss / self.world_size
 

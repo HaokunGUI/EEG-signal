@@ -1,10 +1,10 @@
 torchrun \
     --standalone \
-    --nproc_per_node=2 \
+    --nproc_per_node=3 \
     run.py \
     --task_name anomaly_detection \
     --model VQ_BERT \
-    --learning_rate 5e-5 \
+    --learning_rate 1e-4 \
     --normalize \
     --patience 0 \
     --num_epochs 60 \
@@ -15,13 +15,13 @@ torchrun \
     --e_layers 4 \
     --d_hidden 128 \
     --d_model 512 \
-    --train_batch_size 64 \
-    --test_batch_size 64 \
+    --train_batch_size 32 \
+    --test_batch_size 32 \
     --dropout 0.3 \
     --min_space 1 \
     --mask_dropout 0.0 \
     --enc_type "rel" \
     --balanced \
     --use_scheduler \
-    --num_workers 16 \
-    --pretrained_path "/home/guihaokun/Time-Series-Pretrain/logging/ssl/VQ_BERT/VQ_BERT_231102_020307/checkpoint/last.pth.tar"
+    --num_workers 8 \
+    --pretrained_path "/home/guihaokun/Time-Series-Pretrain/logging/ssl/VQ_BERT/VQ_BERT_231103_210822/checkpoint/last.pth.tar"

@@ -6,7 +6,6 @@ import torch.nn as nn
 from torch import optim
 import os
 import warnings
-import numpy as np
 import argparse
 from tqdm import tqdm
 import json
@@ -21,7 +20,7 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 import os
 import torch.distributed as dist
 from torchvision.ops.focal_loss import sigmoid_focal_loss
-from torchmetrics.classification import BinaryAccuracy, BinaryAUROC, BinaryPrecisionRecallCurve, BinaryRecall, BinaryF1Score
+from torchmetrics.classification import BinaryAccuracy, BinaryAUROC, BinaryRecall, BinaryF1Score
 
 warnings.filterwarnings('ignore')
 
