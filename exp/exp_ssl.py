@@ -15,7 +15,7 @@ from utils.graph import *
 from utils.loss import *
 from utils.tools import *
 from utils.visualize import *
-from torch.optim.lr_scheduler import CosineAnnealingLR
+from torch.optim.lr_scheduler import CosineAnnealingLR, SequentialLR, LinearLR
 from utils.constants import *
 import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
@@ -60,7 +60,14 @@ class Exp_SSL(Exp_Basic):
         if self.args.model in ['DCRNN']:
             model_optim = optim.Adam(self.model.parameters(), lr=self.args.learning_rate, weight_decay=self.args.weight_decay)
         elif self.args.model in ['VQ_BERT']:
-            model_optim = optim.Adam(self.model.parameters(), lr=self.args.learning_rate, weight_decay=self.args.weight_decay)
+            params = []
+            for name, param in self.model.named_parameters():
+                if 'bias' in name or 'layer_norm' in name:
+                    param_group = {'params': [param], 'weight_decay': 0}
+                else:
+                    param_group = {'params': [param], 'weight_decay': self.args.weight_decay}
+                params.append(param_group)
+            model_optim = optim.AdamW(params, lr=self.args.learning_rate)
         return model_optim
 
     def _select_criterion(self):
@@ -71,7 +78,14 @@ class Exp_SSL(Exp_Basic):
         return criterion
     
     def _select_scheduler(self, optimizer):
-        scheduler = CosineAnnealingLR(optimizer, T_max=self.args.num_epochs)
+        if self.args.model in ['DCRNN']:
+            scheduler = CosineAnnealingLR(optimizer, T_max=self.args.num_epochs)
+        elif self.args.model in ['VQ_BERT']:
+            scheduler1 = LinearLR(optimizer, start_factor=0.1, total_iters=20)
+            scheduler2 = CosineAnnealingLR(optimizer, T_max=self.args.num_epochs)
+            scheduler = SequentialLR(optimizer, [scheduler1, scheduler2], milestones=[20])
+        else:
+            raise NotImplementedError
         return scheduler
 
     def vali(self, vali_loader, criterion):

@@ -23,5 +23,7 @@ torchrun \
     --min_space 1 \
     --mask_dropout 0.0 \
     --num_workers 8 \
+    --weight_decay 1e-4 \
     --enc_type "rel" \
-    --mask_type "poisson"
+    --mask_type "poisson" \
+    --use_scheduler

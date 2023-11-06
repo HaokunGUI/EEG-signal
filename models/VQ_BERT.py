@@ -102,7 +102,7 @@ class VQ_BERT(nn.Module):
                             ) #[bs, T]
             mask = torch.from_numpy(mask).to(x.device)
             masked_num = mask.sum() #[bs]
-            random_sample = torch.normal(mean=0, std=0.1, size=(masked_num, D)).to(x.device) #[bs, masked_num, D]
+            random_sample = torch.normal(mean=0, std=5.0, size=(masked_num, D)).to(x.device) #[bs, masked_num, D]
             token[mask] = random_sample
 
         if self.enc_type == 'abs':
