@@ -4,7 +4,7 @@ torchrun \
     run.py \
     --task_name ssl \
     --model VQ_BERT \
-    --learning_rate 5e-2 \
+    --learning_rate 5e-3 \
     --normalize \
     --patience 0 \
     --num_epochs 300 \

@@ -120,7 +120,7 @@ class InceptionTokenizer(nn.Module):
         self.max_conv = nn.Conv1d(in_channel, in_channel, kernel_size=1, stride=1, padding=0, bias=False)
 
         self.conv_1 = nn.Conv1d(in_channel*(kernel_num+1), embedding_dim, kernel_size=1, stride=1, padding=0, bias=False)
-        self.deepwise_conv = nn.Conv1d(embedding_dim, embedding_dim, kernel_size=patch_size, stride=1, padding=0, groups=embedding_dim, bias=False)
+        self.deepwise_conv = nn.AdaptiveMaxPool1d(1)
         self.conv_2 = nn.Conv1d(embedding_dim, embedding_dim, kernel_size=1, stride=1, padding=0, bias=False)
         self.layer_norm = nn.LayerNorm(embedding_dim)
         
@@ -131,11 +131,12 @@ class InceptionTokenizer(nn.Module):
         x = x.reshape(B, patch_num, self.patch_size, C).permute(0, 1, 3, 2).reshape(-1, C, self.patch_size)
 
         # x [B*T, C, D]
-        x_inception = self.bottleneck_conv1d(x)
         conv_list = []
+        max_pooling = self.max_conv(self.max_pooling(x))
+        conv_list.append(max_pooling)
+        x_inception = self.bottleneck_conv1d(x)
         for i in range(self.kernel_num):
             conv_list.append(self.conv1d[i](x_inception))
-        conv_list.append(self.max_conv(self.max_pooling(x)))
         x = torch.cat(conv_list, dim=1)
 
         x = self.conv_1(x)
