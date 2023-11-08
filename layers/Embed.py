@@ -105,7 +105,7 @@ class InceptionTokenizer(nn.Module):
             patch_size (int): The size of the data patches to be processed.
             embedding_dim (int): The dimension of the output embeddings.
         """
-        super(DecomposeTokenizer, self).__init__()
+        super(InceptionTokenizer, self).__init__()
         self.patch_size = patch_size
         self.embedding_dim = embedding_dim
         self.in_channel = in_channel
