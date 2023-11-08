@@ -118,6 +118,7 @@ if __name__ == '__main__':
     parser.add_argument('--weight_decay', type=float, default=0.0, help='optimizer weight decay')
     parser.add_argument('--max_norm', type=float, default=1.0, help='max norm of grad')
     parser.add_argument('--use_scheduler', action='store_true', default=False, help='use scheduler or not')
+    parser.add_argument('--warmup_epochs', type=int, default=20, help='warmup epochs')
 
     # GPU
     parser.add_argument('--use_gpu', type=bool, default=True, help='use gpu')

@@ -4,9 +4,8 @@ import torch
 import torch.nn as nn
 from utils.utils import compute_mask_indices
 from layers.BERT_Blocks import ConformerEncoderLayer
-from layers.Embed import PositionalEmbedding, Tokenizer, RelPositionalEncoding
+from layers.Embed import PositionalEmbedding, Tokenizer, RelPositionalEncoding, DecomposeTokenizer
 from layers.Quantize import Quantize
-from layers.Normalize import RevIN
 import argparse
 
 class VQ_BERT(nn.Module):
@@ -42,10 +41,11 @@ class VQ_BERT(nn.Module):
         self.codebook_item = codebook_item
         self.enc_type = enc_type
         self.mask_type = mask_type
-        self.IN = nn.InstanceNorm1d(in_channel)
 
-        self.tokenizer = Tokenizer(in_channel=in_channel, patch_size=patch_size, 
-                                   embedding_dim=d_model)
+        # self.tokenizer = Tokenizer(in_channel=in_channel, patch_size=patch_size, 
+        #                            embedding_dim=d_model)
+        self.tokenizer = DecomposeTokenizer(in_channel=in_channel, patch_size=patch_size,
+                                            embedding_dim=d_model)
         if self.enc_type == 'abs':
             self.positional_encoding = PositionalEmbedding(d_model, max_len=patch_num)
         elif self.enc_type == 'rel':
@@ -81,8 +81,6 @@ class VQ_BERT(nn.Module):
         # attention masking for padded token
         # x:[batch_size, seq_len, in_channel]
 
-        # normalize the input
-        x = self.IN(x.permute(0, 2, 1)).permute(0, 2, 1) # [batchsize, seq_len, in_channel]
         # tokenize the input 
         token = self.tokenizer(x) # [batchsize, patch_num, embedding_dim]
         B, T, D = token.shape
@@ -102,7 +100,7 @@ class VQ_BERT(nn.Module):
                             ) #[bs, T]
             mask = torch.from_numpy(mask).to(x.device)
             masked_num = mask.sum() #[bs]
-            random_sample = torch.normal(mean=0, std=5.0, size=(masked_num, D)).to(x.device) #[bs, masked_num, D]
+            random_sample = torch.normal(mean=0, std=1, size=(masked_num, D)).to(x.device) #[bs, masked_num, D]
             token[mask] = random_sample
 
         if self.enc_type == 'abs':

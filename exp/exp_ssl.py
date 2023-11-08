@@ -81,9 +81,9 @@ class Exp_SSL(Exp_Basic):
         if self.args.model in ['DCRNN']:
             scheduler = CosineAnnealingLR(optimizer, T_max=self.args.num_epochs)
         elif self.args.model in ['VQ_BERT']:
-            scheduler1 = LinearLR(optimizer, start_factor=0.1, total_iters=20)
-            scheduler2 = CosineAnnealingLR(optimizer, T_max=self.args.num_epochs)
-            scheduler = SequentialLR(optimizer, [scheduler1, scheduler2], milestones=[20])
+            scheduler1 = LinearLR(optimizer, start_factor=0.1, total_iters=self.args.warmup_epochs)
+            scheduler2 = CosineAnnealingLR(optimizer, T_max=self.args.num_epochs - self.args.warmup_epochs)
+            scheduler = SequentialLR(optimizer, [scheduler1, scheduler2], milestones=[self.args.warmup_epochs])
         else:
             raise NotImplementedError
         return scheduler
@@ -241,7 +241,13 @@ class Exp_SSL(Exp_Basic):
                 if early_stopping.early_stop:
                     break
             if self.args.use_scheduler:
-                scheduler.step()
+                if self.args.model in ['VQ_BERT']:
+                    if self.args.warmup_epochs <= epoch:
+                        scheduler[1].step(vali_loss)
+                    else:
+                        scheduler[0].step()
+                else:
+                    scheduler.step()
         return
 
     def test(self, model_file:str='best.pth.tar', model_dir:str=None):

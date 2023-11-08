@@ -1,13 +1,13 @@
 torchrun \
     --standalone \
-    --nproc_per_node=3 \
+    --nproc_per_node=4 \
     run.py \
     --task_name ssl \
     --model VQ_BERT \
-    --learning_rate 1e-2 \
+    --learning_rate 5e-3 \
     --normalize \
     --patience 0 \
-    --num_epochs 300 \
+    --num_epochs 400 \
     --mask_length 3 \
     --mask_ratio 0.15 \
     --codebook_num 4 \
@@ -26,4 +26,5 @@ torchrun \
     --weight_decay 1e-4 \
     --enc_type "rel" \
     --mask_type "poisson" \
-    --use_scheduler
+    --use_scheduler \
+    --warmup_epochs 20

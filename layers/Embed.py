@@ -96,6 +96,46 @@ class Tokenizer(nn.Module):
         return encoding
     
 
+
+class DecomposeTokenizer(nn.Module):
+    def __init__(self, in_channel: int, patch_size: int, embedding_dim: int, kernel_num: int=5):
+        """
+        Initializes a Tokenizer module for processing input data.
+
+        Args:
+            in_channel (int): The number of input channels in the time series data.
+            patch_size (int): The size of the data patches to be processed.
+            embedding_dim (int): The dimension of the output embeddings.
+        """
+        super(DecomposeTokenizer, self).__init__()
+        self.patch_size = patch_size
+        self.embedding_dim = embedding_dim
+        self.in_channel = in_channel
+        self.kernel_num = kernel_num
+        self.conv1d = nn.Conv1d(in_channel*kernel_num, embedding_dim, kernel_size=1, stride=1)
+        self.max_pool = nn.AdaptiveMaxPool1d(1)
+        
+    def forward(self, x):
+        B, S, D = x.shape
+        assert S % self.patch_size == 0, 'Input sequence length must be divisible by the patch size.'
+        patch_num = S // self.patch_size
+        x = x.reshape(B, patch_num, self.patch_size, D).permute(0, 1, 3, 2).reshape(-1, D, self.patch_size)
+
+        def decompose_blk(x:torch.Tensor, kernel_num:int=5):
+            x_new = []
+            for i in range(kernel_num)[::-1]:
+                x_avg = nn.AvgPool1d(kernel_size=2*i+1, stride=1, padding=i)(x)
+                x_new.append(x_avg)
+                x = x - x_avg
+            x = torch.cat(x_new, dim=-2)
+            return x
+
+        x = decompose_blk(x, self.kernel_num)
+        x = self.conv1d(x).reshape(-1, self.patch_size)
+        x = self.max_pool(x).squeeze(-1).reshape(B, patch_num, self.embedding_dim)
+        return x
+
+
 class RelPositionalEncoding(nn.Module):
     """Relative positional encoding module (new implementation).
 
