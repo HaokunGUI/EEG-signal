@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 from utils.utils import compute_mask_indices
 from layers.BERT_Blocks import ConformerEncoderLayer
-from layers.Embed import PositionalEmbedding, Tokenizer, RelPositionalEncoding, DecomposeTokenizer
+from layers.Embed import PositionalEmbedding, Tokenizer, RelPositionalEncoding, InceptionTokenizer
 from layers.Quantize import Quantize
 import argparse
 
@@ -44,8 +44,8 @@ class VQ_BERT(nn.Module):
 
         # self.tokenizer = Tokenizer(in_channel=in_channel, patch_size=patch_size, 
         #                            embedding_dim=d_model)
-        self.tokenizer = DecomposeTokenizer(in_channel=in_channel, patch_size=patch_size,
-                                            embedding_dim=d_model)
+        self.tokenizer = InceptionTokenizer(in_channel=in_channel, patch_size=patch_size,
+                                            embedding_dim=d_model, hidden_dim=8)
         if self.enc_type == 'abs':
             self.positional_encoding = PositionalEmbedding(d_model, max_len=patch_num)
         elif self.enc_type == 'rel':

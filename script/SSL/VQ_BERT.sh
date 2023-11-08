@@ -4,10 +4,10 @@ torchrun \
     run.py \
     --task_name ssl \
     --model VQ_BERT \
-    --learning_rate 5e-3 \
+    --learning_rate 5e-2 \
     --normalize \
     --patience 0 \
-    --num_epochs 400 \
+    --num_epochs 300 \
     --mask_length 3 \
     --mask_ratio 0.15 \
     --codebook_num 4 \

@@ -95,10 +95,8 @@ class Tokenizer(nn.Module):
 
         return encoding
     
-
-
-class DecomposeTokenizer(nn.Module):
-    def __init__(self, in_channel: int, patch_size: int, embedding_dim: int, kernel_num: int=5):
+class InceptionTokenizer(nn.Module):
+    def __init__(self, in_channel: int, patch_size: int, embedding_dim: int, kernel_num: int=5, hidden_dim:int=4):
         """
         Initializes a Tokenizer module for processing input data.
 
@@ -112,27 +110,40 @@ class DecomposeTokenizer(nn.Module):
         self.embedding_dim = embedding_dim
         self.in_channel = in_channel
         self.kernel_num = kernel_num
-        self.conv1d = nn.Conv1d(in_channel*kernel_num, embedding_dim, kernel_size=1, stride=1)
-        self.max_pool = nn.AdaptiveMaxPool1d(1)
+        self.bottleneck_conv1d = nn.Conv1d(in_channel, hidden_dim, kernel_size=1, stride=1, padding=0, bias=False)
+        self.max_pooling = nn.MaxPool1d(kernel_size=3, stride=1, padding=1)
+        self.conv1d = nn.ModuleList(
+            [
+                nn.Conv1d(hidden_dim, in_channel, kernel_size=2*i+1, stride=1, padding=i, bias=False) for i in range(kernel_num)
+            ]
+        )        
+        self.max_conv = nn.Conv1d(in_channel, in_channel, kernel_size=1, stride=1, padding=0, bias=False)
+
+        self.conv_1 = nn.Conv1d(in_channel*(kernel_num+1), embedding_dim, kernel_size=1, stride=1, padding=0, bias=False)
+        self.deepwise_conv = nn.Conv1d(embedding_dim, embedding_dim, kernel_size=patch_size, stride=1, padding=0, groups=embedding_dim, bias=False)
+        self.conv_2 = nn.Conv1d(embedding_dim, embedding_dim, kernel_size=1, stride=1, padding=0, bias=False)
+        self.layer_norm = nn.LayerNorm(embedding_dim)
         
     def forward(self, x):
-        B, S, D = x.shape
-        assert S % self.patch_size == 0, 'Input sequence length must be divisible by the patch size.'
-        patch_num = S // self.patch_size
-        x = x.reshape(B, patch_num, self.patch_size, D).permute(0, 1, 3, 2).reshape(-1, D, self.patch_size)
+        B, T, C = x.shape
+        assert T % self.patch_size == 0, 'Input sequence length must be divisible by the patch size.'
+        patch_num = T // self.patch_size
+        x = x.reshape(B, patch_num, self.patch_size, C).permute(0, 1, 3, 2).reshape(-1, C, self.patch_size)
 
-        def decompose_blk(x:torch.Tensor, kernel_num:int=5):
-            x_new = []
-            for i in range(kernel_num)[::-1]:
-                x_avg = nn.AvgPool1d(kernel_size=2*i+1, stride=1, padding=i)(x)
-                x_new.append(x_avg)
-                x = x - x_avg
-            x = torch.cat(x_new, dim=-2)
-            return x
+        # x [B*T, C, D]
+        x_inception = self.bottleneck_conv1d(x)
+        conv_list = []
+        for i in range(self.kernel_num):
+            conv_list.append(self.conv1d[i](x_inception))
+        conv_list.append(self.max_conv(self.max_pooling(x)))
+        x = torch.cat(conv_list, dim=1)
 
-        x = decompose_blk(x, self.kernel_num)
-        x = self.conv1d(x).reshape(-1, self.patch_size)
-        x = self.max_pool(x).squeeze(-1).reshape(B, patch_num, self.embedding_dim)
+        x = self.conv_1(x)
+        x = self.deepwise_conv(x)
+        x = self.conv_2(x)
+
+        x = x.squeeze(-1).reshape(B, patch_num, -1)
+        x = self.layer_norm(x)
         return x
 
 
