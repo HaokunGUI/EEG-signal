@@ -241,13 +241,7 @@ class Exp_SSL(Exp_Basic):
                 if early_stopping.early_stop:
                     break
             if self.args.use_scheduler:
-                if self.args.model in ['VQ_BERT']:
-                    if self.args.warmup_epochs <= epoch:
-                        scheduler[1].step(vali_loss)
-                    else:
-                        scheduler[0].step()
-                else:
-                    scheduler.step()
+                scheduler.step()
         return
 
     def test(self, model_file:str='best.pth.tar', model_dir:str=None):
