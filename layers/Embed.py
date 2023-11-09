@@ -51,51 +51,9 @@ class PositionalEmbedding(nn.Module):
 
     def forward(self, x):
         return self.pe[:, :x.size(1)]
-
-class Tokenizer(nn.Module):
-    def __init__(self, in_channel: int, patch_size: int, embedding_dim: int):
-        """
-        Initializes a Tokenizer module for processing input data.
-
-        Args:
-            in_channel (int): The number of input channels in the time series data.
-            patch_size (int): The size of the data patches to be processed.
-            embedding_dim (int): The dimension of the output embeddings.
-        """
-        super(Tokenizer, self).__init__()
-        self.patch_size = patch_size
-        self.embedding_dim = embedding_dim
-        self.in_channel = in_channel
-        self.encoding = nn.Linear(patch_size*in_channel, embedding_dim)
-
-    def forward(self, input: torch.Tensor):
-        """
-        Forward pass of the Tokenizer.
-
-        Args:
-            input (torch.Tensor): The input data tensor with dimensions (B, S, D), where
-                B is the batch size, S is the sequence length, and D is the input data dimension.
-
-        Returns:
-            torch.Tensor: The encoded data tensor with dimensions (B, patch_num, embedding_dim), where
-                B is the batch size, patch_num is the num of the patch block and embedding_dim is the 
-                specified embedding dimension.
-        """
-        B, S, D = input.shape
-        assert S % self.patch_size == 0, 'Input sequence length must be divisible by the patch size.'
-
-        # Calculate the number of patches.
-        patch_num = S // self.patch_size
-
-        # Reshape the input into patches, resulting in a tensor with dimensions (B, patch_num, patch_size*D).
-        sequence = input.reshape(B, patch_num, self.patch_size, D).reshape(B, patch_num, -1)
-
-        # Apply the linear layer (encoding) to the sequence.
-        encoding = self.encoding(sequence)
-
-        return encoding
     
-class InceptionTokenizer(nn.Module):
+    
+class Tokenizer(nn.Module):
     def __init__(self, in_channel: int, patch_size: int, embedding_dim: int, kernel_num: int=5, hidden_dim:int=4):
         """
         Initializes a Tokenizer module for processing input data.
@@ -105,7 +63,7 @@ class InceptionTokenizer(nn.Module):
             patch_size (int): The size of the data patches to be processed.
             embedding_dim (int): The dimension of the output embeddings.
         """
-        super(InceptionTokenizer, self).__init__()
+        super(Tokenizer, self).__init__()
         self.patch_size = patch_size
         self.embedding_dim = embedding_dim
         self.in_channel = in_channel
