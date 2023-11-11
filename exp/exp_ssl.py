@@ -81,7 +81,7 @@ class Exp_SSL(Exp_Basic):
         if self.args.model in ['DCRNN']:
             scheduler = CosineAnnealingLR(optimizer, T_max=self.args.num_epochs)
         elif self.args.model in ['VQ_BERT']:
-            scheduler1 = LinearLR(optimizer, start_factor=0.1, total_iters=self.args.warmup_epochs)
+            scheduler1 = LinearLR(optimizer, start_factor=0.5, total_iters=self.args.warmup_epochs)
             scheduler2 = CosineAnnealingLR(optimizer, T_max=self.args.num_epochs - self.args.warmup_epochs)
             scheduler = SequentialLR(optimizer, [scheduler1, scheduler2], milestones=[self.args.warmup_epochs])
         else:

@@ -7,6 +7,7 @@ from layers.BERT_Blocks import ConformerEncoderLayer
 from layers.Embed import PositionalEmbedding, Tokenizer, RelPositionalEncoding
 from layers.Quantize import Quantize
 import argparse
+from collections import Counter
 from layers.Stop_Gradient_Layer import StopGradientLayer
 
 class VQ_BERT(nn.Module):
@@ -45,7 +46,7 @@ class VQ_BERT(nn.Module):
 
         self.tokenizer = Tokenizer(in_channel=in_channel, patch_size=patch_size, embedding_dim=d_model, 
                                    hidden_dim=8)
-        self.stop_layer = StopGradientLayer(warmup_steps=4_000_000)
+        self.stop_layer = StopGradientLayer(warmup_steps=1_000_000)
         if self.enc_type == 'abs':
             self.positional_encoding = PositionalEmbedding(d_model, max_len=patch_num)
         elif self.enc_type == 'rel':
@@ -74,6 +75,7 @@ class VQ_BERT(nn.Module):
             for _ in range(codebook_num):
                 self.final_projector.append(nn.Linear(d_model, codebook_item))
         elif task_name == 'anomaly_detection':
+            self.max_pool1D = nn.AdaptiveMaxPool1d(1)
             self.final_projector = nn.Linear(d_model*patch_num, 1)
 
 
@@ -123,7 +125,7 @@ class VQ_BERT(nn.Module):
             quant_mask = quant_idx[mask] # [masked_num, codebook_num]
             return possibility.view(-1, self.codebook_item), quant_mask.view(-1)
         elif self.task_name == 'anomaly_detection':
-            xm = xm.reshape(B, -1)
+            xm = xm.reshape(B, -1) # [batchsize, 1, embedding_dim]
             xm = self.dropout(xm)
             xm = self.final_projector(xm)
             return xm

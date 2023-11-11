@@ -23,7 +23,7 @@ class StopGradientLayer(nn.Module):
         def custom_sigmoid(x, a, b, min_value, max_value):
             sigmoid_value = 1 / (1 + np.exp(-a * (x - b)))
             return min_value + sigmoid_value * (max_value - min_value)
-        self.func = lambda x: custom_sigmoid(x, 10, 0.5, 1.0, 0.0)
+        self.func = lambda x: custom_sigmoid(x, 10, 0.5, 1.0, 0.01)
         
     def forward(self, x):
         coeff = self.func(self.step / self.warmup_steps)

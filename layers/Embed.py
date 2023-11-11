@@ -78,7 +78,7 @@ class Tokenizer(nn.Module):
         self.max_conv = nn.Conv1d(in_channel, in_channel, kernel_size=1, stride=1, padding=0, bias=False)
 
         self.conv_1 = nn.Conv1d(in_channel*(kernel_num+1), embedding_dim, kernel_size=1, stride=1, padding=0, bias=False)
-        self.deepwise_conv = nn.AdaptiveMaxPool1d(1)
+        self.deepwise_conv = nn.Conv1d(embedding_dim, embedding_dim, kernel_size=patch_size, stride=1, padding=0, groups=embedding_dim, bias=False)
         self.conv_2 = nn.Conv1d(embedding_dim, embedding_dim, kernel_size=1, stride=1, padding=0, bias=False)
         self.layer_norm = nn.LayerNorm(embedding_dim)
         

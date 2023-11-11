@@ -61,7 +61,19 @@ class Exp_Anomaly_Detection(Exp_Basic):
         return data_set, data_loader
 
     def _select_optimizer(self):
-        model_optim = optim.Adam(self.model.parameters(), lr=self.args.learning_rate, weight_decay=self.args.weight_decay)
+        if self.args.model in ['VQ_BERT']:
+            params = []
+            for name, param in self.model.named_parameters():
+                if 'final_projector' in name:
+                    param_group = {'params': param, 'lr': self.args.learning_rate, 'weight_decay': self.args.weight_decay}
+                    params.append(param_group)
+                elif 'transformer_blocks' in name:
+                    param_group = {'params': param, 'lr': self.args.learning_rate*0.1, 'weight_decay': self.args.weight_decay}
+                    params.append(param_group)
+                
+            model_optim = optim.AdamW(params)
+        else:
+            model_optim = optim.AdamW(self.model.parameters(), lr=self.args.learning_rate, weight_decay=self.args.weight_decay)
         return model_optim
 
     def _select_criterion(self):
