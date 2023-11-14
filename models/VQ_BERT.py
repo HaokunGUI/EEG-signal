@@ -2,12 +2,12 @@ import sys
 sys.path.append('/home/guihaokun/Time-Series-Pretrain')
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from utils.utils import compute_mask_indices
 from layers.BERT_Blocks import ConformerEncoderLayer
 from layers.Embed import PositionalEmbedding, Tokenizer, RelPositionalEncoding
 from layers.Quantize import Quantize
 import argparse
-from collections import Counter
 from layers.Stop_Gradient_Layer import StopGradientLayer
 
 class VQ_BERT(nn.Module):
@@ -32,6 +32,7 @@ class VQ_BERT(nn.Module):
         self.n_layers = n_layers
         self.attn_heads = attn_heads
         self.mask_ratio = mask_ratio
+        self.patch_size = patch_size
         self.conv_kernel_size = conv_kernel_size
         self.task_name = task_name
         self.mask_length = mask_length
@@ -44,9 +45,8 @@ class VQ_BERT(nn.Module):
         self.enc_type = enc_type
         self.mask_type = mask_type
 
-        self.tokenizer = Tokenizer(in_channel=in_channel, patch_size=patch_size, embedding_dim=d_model, 
-                                   hidden_dim=8)
-        self.stop_layer = StopGradientLayer(warmup_steps=1_000_000)
+        self.tokenizer = Tokenizer(in_channel=in_channel, patch_size=patch_size, embedding_dim=d_model)
+        # self.stop_layer = StopGradientLayer(warmup_steps=1_000_000)
         if self.enc_type == 'abs':
             self.positional_encoding = PositionalEmbedding(d_model, max_len=patch_num)
         elif self.enc_type == 'rel':
@@ -55,7 +55,7 @@ class VQ_BERT(nn.Module):
             raise ValueError('unknown positional encoding type: {}'.format(self.enc_type))
         
         self.quantize = Quantize(
-            input_dim=d_model,
+            input_dim=in_channel*patch_size,
             vq_dim=vq_dim,
             num_embed=codebook_item,
             codebook_num=codebook_num
@@ -63,7 +63,7 @@ class VQ_BERT(nn.Module):
 
         # paper noted they used 4*hidden_size for ff_network_hidden_size
         self.feed_forward_hidden = d_model * 4
-        self.dropout = nn.Dropout(p=dropout)
+        self.dropout = nn.Dropout(p=0.5)
 
         # multi-layers transformer blocks, deep network
         self.transformer_blocks = nn.ModuleList(
@@ -75,22 +75,21 @@ class VQ_BERT(nn.Module):
             for _ in range(codebook_num):
                 self.final_projector.append(nn.Linear(d_model, codebook_item))
         elif task_name == 'anomaly_detection':
-            self.max_pool1D = nn.AdaptiveMaxPool1d(1)
-            self.final_projector = nn.Linear(d_model*patch_num, 1)
-
+            self.dropout = nn.Dropout(p=dropout)
+            self.final_projector = nn.Linear(d_model, 1)
 
     def forward(self, x):
         # attention masking for padded token
         # x:[batch_size, seq_len, in_channel]
 
         # tokenize the input 
-        token = self.tokenizer(x) # [batchsize, patch_num, in_channel*patch_size]
-        token = self.stop_layer(token)
+        token = self.tokenizer(x) # [batchsize, patch_num, embedding_dim]
+        # token = self.stop_layer(token)
         B, T, D = token.shape
 
         if self.task_name == 'ssl':
             # quantize the input
-            quant_idx = self.quantize(token) # [batchsize, patch_num, codebook_num]
+            quant_idx = self.quantize(x.reshape(B, T, -1)) # [batchsize, patch_num, codebook_num]
             
             mask = compute_mask_indices((B, T),
                                 None,
@@ -125,9 +124,9 @@ class VQ_BERT(nn.Module):
             quant_mask = quant_idx[mask] # [masked_num, codebook_num]
             return possibility.view(-1, self.codebook_item), quant_mask.view(-1)
         elif self.task_name == 'anomaly_detection':
-            xm = xm.reshape(B, -1) # [batchsize, 1, embedding_dim]
             xm = self.dropout(xm)
-            xm = self.final_projector(xm)
+            xm = self.final_projector(xm).squeeze(-1) # [batchsize, patch_num]
+            xm = torch.max(xm, dim=-1, keepdim=True)[0]
             return xm
         else:
             return xm

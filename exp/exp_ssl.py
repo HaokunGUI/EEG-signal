@@ -121,7 +121,7 @@ class Exp_SSL(Exp_Basic):
                     loss = criterion(y, y_pred)
                 elif self.args.model in ['VQ_BERT']:
                     pred, label = self.model(x)
-                    loss = criterion(pred, label)
+                    loss = self.criterion(pred, label).to(self.device)
                 else:
                     raise NotImplementedError
                 loss_val = loss.item()
@@ -286,7 +286,7 @@ class Exp_SSL(Exp_Basic):
                     loss = criterion(y, y_pred)
                 elif self.args.model in ['VQ_BERT']:
                     pred, label = self.model(x)
-                    loss = criterion(pred, label)
+                    loss = self.criterion(pred, label).to(self.device)
                 else:
                     raise NotImplementedError
                 

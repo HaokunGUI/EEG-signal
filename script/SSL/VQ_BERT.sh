@@ -15,7 +15,7 @@ torchrun \
     --kernel_size 5 \
     --attn_head 8 \
     --e_layers 4 \
-    --d_model 512 \
+    --d_model 768 \
     --d_hidden 512 \
     --train_batch_size 64 \
     --test_batch_size 64 \
@@ -23,7 +23,6 @@ torchrun \
     --min_space 1 \
     --mask_dropout 0.0 \
     --num_workers 8 \
-    --weight_decay 1e-4 \
     --enc_type "rel" \
     --mask_type "poisson" \
     --use_scheduler \

@@ -64,11 +64,16 @@ class Exp_Anomaly_Detection(Exp_Basic):
         if self.args.model in ['VQ_BERT']:
             params = []
             for name, param in self.model.named_parameters():
+                if 'layer_norm' in name or 'bias' in name:
+                    weight_decay = 0.0
+                else:
+                    weight_decay = self.args.weight_decay
+                    
                 if 'final_projector' in name:
-                    param_group = {'params': param, 'lr': self.args.learning_rate, 'weight_decay': self.args.weight_decay}
+                    param_group = {'params': param, 'lr': self.args.learning_rate, 'weight_decay': weight_decay}
                     params.append(param_group)
-                elif 'transformer_blocks' in name:
-                    param_group = {'params': param, 'lr': self.args.learning_rate*0.1, 'weight_decay': self.args.weight_decay}
+                else:
+                    param_group = {'params': param, 'lr': self.args.learning_rate*0.1, 'weight_decay': weight_decay}
                     params.append(param_group)
                 
             model_optim = optim.AdamW(params)
