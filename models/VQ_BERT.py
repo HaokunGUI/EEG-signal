@@ -63,25 +63,26 @@ class VQ_BERT(nn.Module):
 
         # paper noted they used 4*hidden_size for ff_network_hidden_size
         self.feed_forward_hidden = d_model * 4
-        self.dropout = nn.Dropout(p=0.5)
 
         # multi-layers transformer blocks, deep network
         self.transformer_blocks = nn.ModuleList(
             [ConformerEncoderLayer(d_model, self.feed_forward_hidden, attn_heads, dropout, conv_kernel_size, enc_type=enc_type) 
             for _ in range(n_layers)])
+
+        self.instance_norm = nn.InstanceNorm1d(in_channel)
         
         if task_name == 'ssl':
             self.final_projector = nn.ModuleList()
             for _ in range(codebook_num):
                 self.final_projector.append(nn.Linear(d_model, codebook_item))
         elif task_name == 'anomaly_detection':
-            self.dropout = nn.Dropout(p=dropout)
+            self.dropout = nn.Dropout(p=0.5)
             self.final_projector = nn.Linear(d_model, 1)
 
     def forward(self, x):
         # attention masking for padded token
         # x:[batch_size, seq_len, in_channel]
-
+        x = self.instance_norm(x)
         # tokenize the input 
         token = self.tokenizer(x) # [batchsize, patch_num, embedding_dim]
         # token = self.stop_layer(token)
@@ -89,7 +90,10 @@ class VQ_BERT(nn.Module):
 
         if self.task_name == 'ssl':
             # quantize the input
-            quant_idx = self.quantize(x.reshape(B, T, -1)) # [batchsize, patch_num, codebook_num]
+            quant_idx = self.quantize(
+                x
+                .reshape(B, T, -1)
+                ) # [batchsize, patch_num, codebook_num]
             
             mask = compute_mask_indices((B, T),
                                 None,

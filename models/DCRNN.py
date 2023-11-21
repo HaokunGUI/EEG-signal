@@ -210,7 +210,7 @@ class DCRNNModel_classification(nn.Module):
                                     dcgru_activation=args.dcgru_activation,
                                     filter_type=args.filter_type)
 
-        self.fc = nn.Linear(rnn_units, num_classes)
+        self.final_projector = nn.Linear(rnn_units, num_classes)
         self.dropout = nn.Dropout(args.dropout)
         self.relu = nn.ReLU()
 
@@ -245,7 +245,7 @@ class DCRNNModel_classification(nn.Module):
         last_out = last_out
 
         # final FC layer
-        logits = self.fc(self.relu(self.dropout(last_out)))
+        logits = self.final_projector(self.relu(self.dropout(last_out)))
 
         # max-pooling over nodes
         pool_logits, _ = torch.max(logits, dim=1)  # (batch_size, num_classes)

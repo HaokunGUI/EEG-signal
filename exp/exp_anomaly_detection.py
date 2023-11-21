@@ -17,10 +17,11 @@ from utils.visualize import *
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from utils.constants import *
 from torch.nn.parallel import DistributedDataParallel as DDP
+from torch.distributed import barrier
 import os
 import torch.distributed as dist
 from torchvision.ops.focal_loss import sigmoid_focal_loss
-from torchmetrics.classification import BinaryAccuracy, BinaryAUROC, BinaryRecall, BinaryF1Score
+from torchmetrics.classification import BinaryAccuracy, BinaryAUROC, BinaryRecall, BinaryF1Score, BinaryROC, BinaryConfusionMatrix
 
 warnings.filterwarnings('ignore')
 
@@ -33,7 +34,10 @@ class Exp_Anomaly_Detection(Exp_Basic):
         # model init
         model = self.model_dict[self.args.model].Model(self.args).cuda()
         if self.args.use_gpu:
-            model = DDP(model, device_ids=[self.device], find_unused_parameters=True)
+            if self.args.model in ['TimesNet', 'VQ_BERT']:
+                model = DDP(model, device_ids=[self.device], find_unused_parameters=True)
+            elif self.args.model in ['DCRNN']:
+                model = nn.DataParallel(model, device_ids=[self.device])
         if self.args.use_pretrained:
             load_model_checkpoint(self.args.pretrained_path, model, map_location=self.device)
         return model
@@ -72,9 +76,9 @@ class Exp_Anomaly_Detection(Exp_Basic):
                 if 'final_projector' in name:
                     param_group = {'params': param, 'lr': self.args.learning_rate, 'weight_decay': weight_decay}
                     params.append(param_group)
-                else:
-                    param_group = {'params': param, 'lr': self.args.learning_rate*0.1, 'weight_decay': weight_decay}
-                    params.append(param_group)
+                # else:
+                #     param_group = {'params': param, 'lr': self.args.learning_rate*0.1, 'weight_decay': weight_decay}
+                #     params.append(param_group)
                 
             model_optim = optim.AdamW(params)
         else:
@@ -249,6 +253,7 @@ class Exp_Anomaly_Detection(Exp_Basic):
                 early_stopping(vali_metrics['auroc'])
                 if early_stopping.early_stop:
                     break
+                barrier()
             
             if self.args.use_scheduler:
                 scheduler.step()
@@ -297,24 +302,31 @@ class Exp_Anomaly_Detection(Exp_Basic):
                 y_preds.append(y_pred)
                 y_trues.append(y)
 
-            y_pred = torch.cat(y_preds, dim=0)
-            y_true = torch.cat(y_trues, dim=0)
+        y_pred = torch.cat(y_preds, dim=0)
+        y_true = torch.cat(y_trues, dim=0)
 
-            y_preds = [torch.zeros_like(y_pred) for _ in range(self.world_size)]
-            y_trues = [torch.zeros_like(y_true) for _ in range(self.world_size)]
-            dist.all_gather(y_preds, y_pred)
-            dist.all_gather(y_trues, y_true)
-            y_preds = torch.cat(y_preds, dim=0)
-            y_trues = torch.cat(y_trues, dim=0)
+        y_preds = [torch.zeros_like(y_pred) for _ in range(self.world_size)]
+        y_trues = [torch.zeros_like(y_true) for _ in range(self.world_size)]
+        dist.all_gather(y_preds, y_pred)
+        dist.all_gather(y_trues, y_true)
+        y_preds = torch.cat(y_preds, dim=0)
+        y_trues = torch.cat(y_trues, dim=0)
 
-            acc_metric = BinaryAccuracy().cuda()
-            acc = acc_metric(torch.sigmoid(y_preds), y_trues).cpu().item()
-            auroc = self.auroc(torch.sigmoid(y_preds), y_trues).cpu().item()
-            recall_metric = BinaryRecall().cuda()
-            f1_score_metric = BinaryF1Score().cuda()
-            recall = recall_metric(torch.sigmoid(y_preds), y_trues).cpu().item()
-            f1_score = f1_score_metric(torch.sigmoid(y_preds), y_trues).cpu().item()
-
+        acc_metric = BinaryAccuracy().cuda()
+        acc = acc_metric(torch.sigmoid(y_preds), y_trues.int()).cpu().item()
+        auroc = self.auroc(torch.sigmoid(y_preds), y_trues.int()).cpu().item()
+        recall_metric = BinaryRecall().cuda()
+        f1_score_metric = BinaryF1Score().cuda()
+        recall = recall_metric(torch.sigmoid(y_preds), y_trues.int()).cpu().item()
+        f1_score = f1_score_metric(torch.sigmoid(y_preds), y_trues.int()).cpu().item()
+        roc_metric = BinaryROC().cuda()
+        roc_metric.update(torch.sigmoid(y_preds), y_trues.int())
+        fig_, ax_ = roc_metric.plot(score=True)
+        self.logging.add_figure('test/roc', fig_)
+        confusion_matrix = BinaryConfusionMatrix().cuda()
+        confusion_matrix.update(torch.sigmoid(y_preds), y_trues.int())
+        fig_, ax_ = confusion_matrix.plot()
+        self.logging.add_figure('test/confusion_matrix', fig_)
 
         self.logging.add_scalar('test/acc', acc)
         self.logging.add_scalar('test/auroc', auroc)

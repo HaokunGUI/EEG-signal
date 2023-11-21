@@ -31,7 +31,10 @@ class Exp_SSL(Exp_Basic):
         # model init
         model = self.model_dict[self.args.model].Model(self.args).cuda()
         if self.args.use_gpu:
-            model = DDP(model, device_ids=[self.device], find_unused_parameters=True)
+            if self.args.model in ['DCRNN']:
+                model = DDP(model, device_ids=[self.device])
+            elif self.args.model in ['VQ_BERT']:
+                model = DDP(model, device_ids=[self.device], find_unused_parameters=True)
         return model
     
     def _get_scalar(self):
@@ -72,7 +75,7 @@ class Exp_SSL(Exp_Basic):
 
     def _select_criterion(self):
         if self.args.model in ['DCRNN']:
-            criterion = loss_fn(self.scalar, self.args.loss_fn, is_tensor=True, mask_val=0.)
+            criterion = loss_fn(standard_sclar=None, loss_fn=self.args.loss_fn, is_tensor=True, mask_val=0.)
         elif self.args.model in ['VQ_BERT']:
             criterion = nn.CrossEntropyLoss().to(self.device)
         return criterion
@@ -111,9 +114,9 @@ class Exp_SSL(Exp_Basic):
                     y = y.permute(0, 2, 1, 3)
 
                 if self.args.use_fft:
-                    x = torch.fft.rfft(x)[..., 1:self.args.input_dim+1]
+                    x = torch.fft.rfft(x)[..., 1:]
                     x = torch.log(torch.abs(x) + 1e-8)
-                    y = torch.fft.rfft(y)[..., 1:self.args.output_dim+1]
+                    y = torch.fft.rfft(y)[..., 1:]
                     y = torch.log(torch.abs(y) + 1e-8)
 
                 if self.args.model in ['DCRNN']:

@@ -4,7 +4,7 @@ torchrun \
     run.py \
     --task_name anomaly_detection \
     --model TimesNet \
-    --learning_rate 1e-3 \
+    --learning_rate 2e-3 \
     --patience 0 \
     --d_hidden 8 \
     --num_kernels 6 \
