@@ -22,6 +22,9 @@ import os
 import torch.distributed as dist
 from torchvision.ops.focal_loss import sigmoid_focal_loss
 from torchmetrics.classification import BinaryAccuracy, BinaryAUROC, BinaryRecall, BinaryF1Score, BinaryROC, BinaryConfusionMatrix
+from layers.BERT_Blocks import ConformerEncoderLayer
+from layers.Embed import Tokenizer
+from layers.Quantize import Quantize
 
 warnings.filterwarnings('ignore')
 
@@ -40,6 +43,23 @@ class Exp_Anomaly_Detection(Exp_Basic):
                 model = nn.DataParallel(model, device_ids=[self.device])
         if self.args.use_pretrained:
             load_model_checkpoint(self.args.pretrained_path, model, map_location=self.device)
+
+        if self.args.model in ['VQ_BERT']:
+            self.freeze_model = ['tokenizer'] + [f'transformer_blocks.{i}' for i in range(3)]
+            # self.random_init_model = [f'transformer_blocks.{i}' for i in range(3, 4)]
+            for name, param in model.named_parameters():
+                if any([f in name for f in self.freeze_model]):
+                    param.requires_grad = False
+                else:
+                    param.requires_grad = True
+
+                # if any([f in name for f in self.random_init_model]):
+                #     if any([f in name for f in ['layer_norm.weight', 'ln.weight', 'batch_norm.weight']]):
+                #         nn.init.constant_(param, 1)
+                #     elif any([f in name for f in ['weight']]):
+                #         nn.init.kaiming_normal_(param, mode='fan_out', nonlinearity='relu')
+                #     elif any([f in name for f in ['bias']]):
+                #         nn.init.constant_(param, 0)
         return model
     
     def _get_scalar(self):
@@ -68,7 +88,11 @@ class Exp_Anomaly_Detection(Exp_Basic):
         if self.args.model in ['VQ_BERT']:
             params = []
             for name, param in self.model.named_parameters():
-                if 'layer_norm' in name or 'bias' in name:
+                # only update the parameters that are not frozen
+                if not param.requires_grad:
+                    continue
+                # not using decay in bias & ln
+                if any([f in name for f in ['bias', 'layer_norm', 'ln']]):
                     weight_decay = 0.0
                 else:
                     weight_decay = self.args.weight_decay
@@ -76,9 +100,9 @@ class Exp_Anomaly_Detection(Exp_Basic):
                 if 'final_projector' in name:
                     param_group = {'params': param, 'lr': self.args.learning_rate, 'weight_decay': weight_decay}
                     params.append(param_group)
-                # else:
-                #     param_group = {'params': param, 'lr': self.args.learning_rate*0.1, 'weight_decay': weight_decay}
-                #     params.append(param_group)
+                else:
+                    param_group = {'params': param, 'lr': self.args.learning_rate*0.1, 'weight_decay': weight_decay}
+                    params.append(param_group)
                 
             model_optim = optim.AdamW(params)
         else:
@@ -145,6 +169,8 @@ class Exp_Anomaly_Detection(Exp_Basic):
         metrics = {'acc': acc, 'auroc': auroc}
 
         self.model.train()
+        if self.args.model in ['VQ_BERT']:
+            freeze_layer(self.model, num_freeze_layers=3)
         return metrics
 
     def train(self):
@@ -172,6 +198,9 @@ class Exp_Anomaly_Detection(Exp_Basic):
         for epoch in range(self.args.num_epochs): 
             start_draw = True
             self.model.train()
+            if self.args.model in ['VQ_BERT']:
+                freeze_layer(self.model, num_freeze_layers=3)
+
             with tqdm(train_loader.dataset, desc=f'Epoch: {epoch + 1} / {self.args.num_epochs}', \
                                               disable=(self.device != 0)) as progress_bar:
                 for x, y, augment in train_loader:
@@ -333,4 +362,18 @@ class Exp_Anomaly_Detection(Exp_Basic):
         self.logging.add_scalar('test/recall', recall)
         self.logging.add_scalar('test/f1_score', f1_score)
         return
-    
+
+
+def freeze_layer(net, num_freeze_layers=3):
+    bert_layers = []
+    for name, m in net.named_modules():
+        if isinstance(m, ConformerEncoderLayer):
+            bert_layers.append(m)
+        if isinstance(m, Quantize):
+            m.eval()
+        if isinstance(m, Tokenizer):
+            m.eval()
+        if isinstance(m, nn.InstanceNorm1d):
+            m.eval()
+    for i in range(num_freeze_layers):
+        bert_layers[i].eval()

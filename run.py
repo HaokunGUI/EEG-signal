@@ -1,7 +1,6 @@
 import argparse
 import torch
 from exp.exp_anomaly_detection import Exp_Anomaly_Detection
-from exp.exp_classification import Exp_Classification
 from exp.exp_ssl import Exp_SSL
 import torch.multiprocessing
 from utils.tools import ddp_setup, ddp_cleanup, seed_torch
@@ -19,8 +18,6 @@ def main(args: argparse.Namespace):
 
     if args.task_name == 'anomaly_detection':
         Exp = Exp_Anomaly_Detection
-    elif args.task_name == 'classification':
-        Exp = Exp_Classification
     elif args.task_name == 'ssl':
         Exp = Exp_SSL
     else:

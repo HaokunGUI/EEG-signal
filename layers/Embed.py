@@ -68,6 +68,7 @@ class Tokenizer(nn.Module):
         self.embedding_dim = embedding_dim
         self.in_channel = in_channel
         self.encoding = nn.Linear(patch_size*in_channel, embedding_dim)
+        # self.layer_norm = nn.LayerNorm(embedding_dim)
         self.activation = nn.SiLU()
 
     def forward(self, input: torch.Tensor):
@@ -96,6 +97,7 @@ class Tokenizer(nn.Module):
         encoding = self.encoding(sequence)
 
         return self.activation(encoding)
+        # return self.layer_norm(self.activation(encoding))
     
 
 class RelPositionalEncoding(nn.Module):

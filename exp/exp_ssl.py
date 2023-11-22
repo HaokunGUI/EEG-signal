@@ -65,7 +65,7 @@ class Exp_SSL(Exp_Basic):
         elif self.args.model in ['VQ_BERT']:
             params = []
             for name, param in self.model.named_parameters():
-                if 'bias' in name or 'layer_norm' in name:
+                if ('bias' in name) or ('layer_norm' in name) or ('ln' in name):
                     param_group = {'params': [param], 'weight_decay': 0}
                 else:
                     param_group = {'params': [param], 'weight_decay': self.args.weight_decay}
@@ -164,11 +164,11 @@ class Exp_SSL(Exp_Basic):
         for epoch in range(self.args.num_epochs): 
             start_draw = True
             self.model.train()
+            train_loader.sampler.set_epoch(epoch)
 
             with tqdm(train_loader.dataset, desc=f'Epoch: {epoch + 1} / {self.args.num_epochs}', \
                                               disable=(self.device != 0)) as progress_bar:
                 for x, y, augment in train_loader:
-                    train_loader.sampler.set_epoch(epoch)
                     model_optim.zero_grad()
 
                     batch_size = x.size(0)

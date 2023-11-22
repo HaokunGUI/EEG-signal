@@ -60,6 +60,12 @@ class VQ_BERT(nn.Module):
             num_embed=codebook_item,
             codebook_num=codebook_num
             )
+        # self.quantize = Quantize(
+        #     input_dim=d_model,
+        #     vq_dim=vq_dim,
+        #     num_embed=codebook_item,
+        #     codebook_num=codebook_num
+        #     )
 
         # paper noted they used 4*hidden_size for ff_network_hidden_size
         self.feed_forward_hidden = d_model * 4
