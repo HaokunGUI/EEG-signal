@@ -3,6 +3,11 @@
 - ssl/VQ_BERT/VQ_BERT_231115_082946/log: normalize before quantizer
 - ssl/VQ_BERT/BERT_with_resident/log: using resident after input
 - ssl/VQ_BERT/VQ_BERT_231116_175206/log: using IN after input
+VQ_BERT_231122_222835 concat(hidden_dim 5)
+VQ_BERT_231123_012549 concat(hidden_dim 1)
+VQ_BERT_231123_151604 softmax sum
+VQ_BERT_231123_163027 glu max
+VQ_BERT_231123_185614 mean
 
 # organized order: quantizer followed by tokenizer
 - ssl/VQ_BERT/VQ_BERT_231121_205431: tokenizer + LN/ input - IN

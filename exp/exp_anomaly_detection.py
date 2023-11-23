@@ -97,7 +97,7 @@ class Exp_Anomaly_Detection(Exp_Basic):
                 else:
                     weight_decay = self.args.weight_decay
                     
-                if 'final_projector' in name:
+                if 'projector' in name:
                     param_group = {'params': param, 'lr': self.args.learning_rate, 'weight_decay': weight_decay}
                     params.append(param_group)
                 else:
@@ -198,15 +198,14 @@ class Exp_Anomaly_Detection(Exp_Basic):
         for epoch in range(self.args.num_epochs): 
             start_draw = True
             self.model.train()
+            train_loader.sampler.set_epoch(epoch)
             if self.args.model in ['VQ_BERT']:
                 freeze_layer(self.model, num_freeze_layers=3)
 
             with tqdm(train_loader.dataset, desc=f'Epoch: {epoch + 1} / {self.args.num_epochs}', \
                                               disable=(self.device != 0)) as progress_bar:
                 for x, y, augment in train_loader:
-                    train_loader.sampler.set_epoch(epoch)
                     model_optim.zero_grad()
-
                     batch_size = x.size(0)
                     x = x.float().to(self.device)
                     y = y.to(self.device)

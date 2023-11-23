@@ -83,7 +83,14 @@ class VQ_BERT(nn.Module):
                 self.final_projector.append(nn.Linear(d_model, codebook_item))
         elif task_name == 'anomaly_detection':
             self.dropout = nn.Dropout(p=0.5)
+            # self.projector = nn.Linear(d_model, 1)
+            # self.relu = nn.ReLU()
+            # self.layer_norm = nn.LayerNorm(1*60)
+            # self.final_projector = nn.Linear(1*60, 1)
             self.final_projector = nn.Linear(d_model, 1)
+            # self.projector = nn.Linear(d_model, 2)
+            # self.glu = nn.GLU(dim=-1)
+
 
     def forward(self, x):
         # attention masking for padded token
@@ -135,8 +142,24 @@ class VQ_BERT(nn.Module):
             return possibility.view(-1, self.codebook_item), quant_mask.view(-1)
         elif self.task_name == 'anomaly_detection':
             xm = self.dropout(xm)
+            # xm = self.projector(xm) # [batchsize, patch_num, 10]
+            # xm = self.relu(xm)
+            # xm = xm.reshape(B, -1)
+            # xm = self.final_projector(xm) # [batchsize, 1]
+
+            # xm = self.final_projector(xm).squeeze(-1) # [batchsize, patch_num]
+            # xm = torch.max(xm, dim=-1, keepdim=True)[0]
+
+            # xm = self.projector(xm) # [batchsize, patch_num, 2]
+            # score = F.softmax(xm[:, :, 0], dim=-1)
+            # xm = torch.sum(score * xm[:, :, 1], dim=-1, keepdim=True) 
+
+            # xm = self.projector(xm) # [batchsize, patch_num, 2]
+            # xm = self.glu(xm).squeeze(-1) # [batchsize, patch_num]
+            # xm = torch.max(xm, dim=-1, keepdim=True)[0] # [batchsize, 1]
+
             xm = self.final_projector(xm).squeeze(-1) # [batchsize, patch_num]
-            xm = torch.max(xm, dim=-1, keepdim=True)[0]
+            xm = torch.max(xm, dim=-1, keepdim=True)[0] # [batchsize, 1]
             return xm
         else:
             return xm
