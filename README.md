@@ -8,6 +8,12 @@ VQ_BERT_231123_012549 concat(hidden_dim 1)
 VQ_BERT_231123_151604 softmax sum
 VQ_BERT_231123_163027 glu max
 VQ_BERT_231123_185614 mean
+VQ_BERT_231123_200443 max
+VQ_BERT_231123_224749 temp 3 ((1 - nn.Sigmoid()(lamda * torch.max(x, dim=-1, keepdim=True)[0])).detach())
+VQ_BERT_231124_002228 temp 5
+VQ_BERT_231124_012626 temp 1
+VQ_BERT_231124_123819 temp 5 lamda * (1 - nn.Sigmoid()(torch.max(x, dim=-1, keepdim=True)[0])).detach()
+
 
 # organized order: quantizer followed by tokenizer
 - ssl/VQ_BERT/VQ_BERT_231121_205431: tokenizer + LN/ input - IN

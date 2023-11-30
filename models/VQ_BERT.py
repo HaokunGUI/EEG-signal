@@ -158,8 +158,18 @@ class VQ_BERT(nn.Module):
             # xm = self.glu(xm).squeeze(-1) # [batchsize, patch_num]
             # xm = torch.max(xm, dim=-1, keepdim=True)[0] # [batchsize, 1]
 
+            # xm = self.final_projector(xm).squeeze(-1) # [batchsize, patch_num]
+            # xm = torch.max(xm, dim=-1, keepdim=True)[0] # [batchsize, 1]
+
             xm = self.final_projector(xm).squeeze(-1) # [batchsize, patch_num]
-            xm = torch.max(xm, dim=-1, keepdim=True)[0] # [batchsize, 1]
+            def aggregation(x: torch.Tensor, lamda: float=5.):
+                temp = lamda * (1 - nn.Sigmoid()(torch.max(x, dim=-1, keepdim=True)[0])).detach()
+                temp = temp + 1e-8
+                score = nn.Softmax(dim=-1)(x / temp)
+                x = torch.sum(x * score, dim=-1, keepdim=True)
+                return x
+            xm = aggregation(xm)
+            
             return xm
         else:
             return xm

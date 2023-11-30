@@ -1,0 +1,23 @@
+torchrun \
+    --standalone \
+    --nproc_per_node=4 \
+    run.py \
+    --task_name ssl \
+    --model BERT \
+    --learning_rate 2e-3 \
+    --normalize \
+    --patience 0 \
+    --num_epochs 300 \
+    --codebook_item 1024 \
+    --e_layers 2 \
+    --d_model 256 \
+    --hidden_channels 16 \
+    --activation "gelu" \
+    --linear_dropout 0.3 \
+    --train_batch_size 64 \
+    --test_batch_size 64 \
+    --dropout 0.3 \
+    --num_workers 8 \
+    --mask_type "poisson" \
+    --use_scheduler \
+    --warmup_epochs 20

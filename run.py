@@ -48,6 +48,7 @@ if __name__ == '__main__':
     parser.add_argument('--log_dir', type=str, default='/home/guihaokun/Time-Series-Pretrain/logging', help='log dir')
     parser.add_argument('--seed', type=int, default=1029, help='random seed')
     parser.add_argument('--last_train_path', type=str, default=None, help='last train model path')
+    parser.add_argument('--activation', type=str, default='gelu', help='activation function, options:[relu, gelu]')
 
     # data loader
     parser.add_argument('--dataset', type=str, default='TUSZ', help='dataset type, options:[TUSZ]')
@@ -95,6 +96,8 @@ if __name__ == '__main__':
     parser.add_argument('--attn_head', type=int, default=4, help='Number of attention heads.')
     parser.add_argument('--kernel_size', type=int, default=3, help='Kernel size.')
     parser.add_argument('--enc_type', type=str, default='rel', help='Encoder type, options:[abs, rel]')
+    parser.add_argument('--linear_dropout', type=float, default=0.5, help='linear dropout ratio')
+    parser.add_argument('--hidden_channels', type=int, default=16, help='hidden channels of conv')
 
     # quantization
     parser.add_argument('--codebook_item', type=int, default=512, help='number of embedding vectors')

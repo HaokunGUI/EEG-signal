@@ -37,9 +37,9 @@ class Exp_Anomaly_Detection(Exp_Basic):
         # model init
         model = self.model_dict[self.args.model].Model(self.args).cuda()
         if self.args.use_gpu:
-            if self.args.model in ['TimesNet', 'VQ_BERT']:
+            if self.args.model in ['VQ_BERT']:
                 model = DDP(model, device_ids=[self.device], find_unused_parameters=True)
-            elif self.args.model in ['DCRNN']:
+            elif self.args.model in ['DCRNN', 'TimesNet']:
                 model = nn.DataParallel(model, device_ids=[self.device])
         if self.args.use_pretrained:
             load_model_checkpoint(self.args.pretrained_path, model, map_location=self.device)
@@ -110,10 +110,10 @@ class Exp_Anomaly_Detection(Exp_Basic):
         return model_optim
 
     def _select_criterion(self):
-        if self.args.model in ['DCRNN', 'VQ_BERT']:
+        if self.args.model in ['DCRNN', 'VQ_BERT', 'TimesNet']:
             criterion = nn.BCEWithLogitsLoss().cuda()
-        elif self.args.model in ['TimesNet']:
-            criterion = sigmoid_focal_loss
+        # elif self.args.model in ['TimesNet']:
+            # criterion = sigmoid_focal_loss
         else:
             raise NotImplementedError
         return criterion
@@ -250,7 +250,8 @@ class Exp_Anomaly_Detection(Exp_Basic):
                         loss = self.criterion(y_pred, y)
                     elif self.args.model in ['TimesNet']:
                         y_pred = self.model(x)
-                        loss = self.criterion(y_pred, y, reduction='mean')
+                        # loss = self.criterion(y_pred, y, reduction='mean')
+                        loss = self.criterion(y_pred, y)
                     elif self.args.model in ['VQ_BERT']:
                         y_pred = self.model(x)
                         loss = self.criterion(y_pred, y)

@@ -4,7 +4,7 @@ torchrun \
     run.py \
     --task_name anomaly_detection \
     --model TimesNet \
-    --learning_rate 2e-3 \
+    --learning_rate 1e-3 \
     --patience 0 \
     --d_hidden 8 \
     --num_kernels 6 \
@@ -12,5 +12,10 @@ torchrun \
     --e_layers 3 \
     --dropout 0.4 \
     --top_k 3 \
-    --num_epochs 40 \
+    --num_epochs 60 \
+    --train_batch_size 64 \
+    --test_batch_size 64 \
+    --balanced \
+    --use_scheduler \
+    --num_workers 8 \
     --normalize 
