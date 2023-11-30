@@ -126,8 +126,8 @@ class Exp_SSL(Exp_Basic):
                     pred, label = self.model(x)
                     loss = self.criterion(pred, label).to(self.device)
                 elif self.args.model in ['BERT']:
-                    pred, label, gram_loss = self.model(x)
-                    loss = self.criterion(pred, label).to(self.device) + gram_loss
+                    pred, label = self.model(x)
+                    loss = self.criterion(pred, label).to(self.device)
                 else:
                     raise NotImplementedError
                 loss_val = loss.item()
@@ -224,8 +224,8 @@ class Exp_SSL(Exp_Basic):
                         pred, label = self.model(x)
                         loss = self.criterion(pred, label).to(self.device)
                     elif self.args.model in ['BERT']:
-                        pred, label, gram_loss = self.model(x)
-                        loss = self.criterion(pred, label).to(self.device) + gram_loss
+                        pred, label = self.model(x)
+                        loss = self.criterion(pred, label).to(self.device)
                     else:
                         raise NotImplementedError
                     
@@ -239,6 +239,7 @@ class Exp_SSL(Exp_Basic):
                     progress_bar.update(batch_size * self.world_size)
                     progress_bar.set_postfix(loss=loss_val, lr=model_optim.param_groups[0]['lr'])
 
+                    
                     self.logging.add_scalar('train/loss', loss_val, self.steps)
                     self.logging.add_scalar('train/lr', model_optim.param_groups[0]['lr'], self.steps)
 
@@ -297,8 +298,8 @@ class Exp_SSL(Exp_Basic):
                     pred, label = self.model(x)
                     loss = self.criterion(pred, label).to(self.device)
                 elif self.args.model in ['BERT']:
-                    pred, label, gram_loss = self.model(x)
-                    loss = self.criterion(pred, label).to(self.device) + gram_loss
+                    pred, label = self.model(x)
+                    loss = self.criterion(pred, label).to(self.device)
                 else:
                     raise NotImplementedError
                 

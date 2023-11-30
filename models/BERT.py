@@ -23,9 +23,7 @@ class BERT(nn.Module):
         self.d_model = d_model
 
         # Project the patch_dim to the d_model dimension
-        self.embeds = nn.ModuleList([
-            nn.Linear(patch_size, d_model) for _ in range(in_channels)
-        ])
+        self.embed = nn.Linear(patch_size, d_model)
         self.activation_embed = self._get_activation_fn(activation)
         self.norm = nn.LayerNorm(d_model)
         
@@ -60,7 +58,7 @@ class BERT(nn.Module):
         # Different decoder for different down stream tasks
         if task_name == 'ssl':
             self.quantizer = Quantize(
-                input_dim=d_model,
+                input_dim=patch_size,
                 vq_dim=d_model,
                 num_embed=codebook_size,
                 codebook_num=1
@@ -87,13 +85,12 @@ class BERT(nn.Module):
         # x: (B, C, T)
         B, C, T = x.shape
         assert T % self.patch_size == 0, f"Time series length should be divisible by patch_size, not {T} % {self.patch_size}"
-        x = x.reshape(B, C, -1, self.patch_size) # (B, C, T, patch_size)
+        x = x.view(B, C, -1, self.patch_size) # (B, C, T, patch_size)
 
         # Embedding
-        y = torch.stack([linear(x[:, i, :, :]) for i, linear in enumerate(self.embeds)], dim=1) # (B, C, T, d_model)
+        y = self.embed(x) # (B, C, T, d_model)
         y = self.activation_embed(y)
         y = self.norm(y) # (B, C, T, d_model)
-        feature = y.clone() # (B, C, T, d_model)
 
         # Add CLS token
         y = torch.concat([self.CLS.repeat(B, C, 1, 1), y], dim=2) # (B, C, T+1, d_model) 
@@ -112,52 +109,48 @@ class BERT(nn.Module):
             mask = torch.from_numpy(mask).to(x.device)
             masked_num = mask.sum() #[bs]
             random_sample = torch.normal(mean=0, std=0.1, size=(masked_num, self.d_model)).to(x.device) #[bs, masked_num, D]
-            y = y.reshape(B*C, *y.shape[2:]) # (B*C, T+1, d_model)
+            y = y.view(B*C, *y.shape[2:]) # (B*C, T+1, d_model)
             y[:, 1:, :][mask] = random_sample
-            y = y.reshape(B, C, *y.shape[1:]) # (B, C, T+1, d_model)
+            y = y.view(B, C, *y.shape[1:]) # (B, C, T+1, d_model)
 
-        y = y.transpose(1, 2).reshape(-1, C, y.shape[-1]) # (B*(T+1), C, d_model)
+        y = y.transpose(1, 2)
+        y = y.contiguous().view(-1, C, y.shape[-1]) # (B*(T+1), C, d_model)
         y = self.agg(y) # (B*(T+1), C', d_model)
-        y = y.reshape(B, -1, self.hidden_channels, y.shape[-1]) # (B, T+1, C', d_model)
+        y = y.view(B, -1, self.hidden_channels, y.shape[-1]) # (B, T+1, C', d_model)
         y = y.transpose(1, 2) # (B, C', T+1, d_model)
-        y = y.reshape(-1, *y.shape[2:]) # (B*C', T+1, d_model)
+        y = y.contiguous().view(-1, *y.shape[2:]) # (B*C', T+1, d_model)
         pos_embed = self.pos_embed(y) # (B*C', T+1, d_model)
         y = y + pos_embed
 
         # Transformer Encoder
-        y = y.reshape(B, self.hidden_channels, *y.shape[1:]) # (B, C', T+1, d_model)
+        y = y.view(B, self.hidden_channels, *y.shape[1:]) # (B, C', T+1, d_model)
         for encoder in self.encoder:
             y = encoder(y) # (B, C', T+1, d_model)
         
         # Decoder
         if self.task_name == 'ssl':
             # Get the idx
-            idx = self.quantizer(feature.reshape(-1, *feature.shape[2:])) # (B*C, T, 1)
+            idx = self.quantizer(x.reshape(-1, *x.shape[2:])) # (B*C, T, 1)
             idx = idx[mask].squeeze(-1) # (masked_num)
 
             # Get the prediction
             y = y.transpose(1, 2) # (B, T+1, C', d_model)
-            y = y.reshape(-1, *y.shape[2:]) # (B*(T+1), C', d_model)
+            y = y.contiguous().view(-1, *y.shape[2:]) # (B*(T+1), C', d_model)
             y = self.decoder(y) # (B(*(T+1), C, d_model)
-            y = y.reshape(B, -1, *y.shape[1:]) # (B, T+1, C, d_model)
+            y = y.view(B, -1, *y.shape[1:]) # (B, T+1, C, d_model)
             y = y.transpose(1, 2) # (B, C, T+1, d_model)
             y = self.activation(y) # (B, C, T+1, d_model)
             y = y[:, :, 1:, :] # (B, C, T, d_model)
-            y = y.reshape(-1, *y.shape[2:]) # (B*C, T, d_model)
+            y = y.contiguous().view(-1, *y.shape[2:]) # (B*C, T, d_model)
             y = y[mask] # (masked_num, d_model)
             y = self.linear_dropout(y)
             y = self.final_projector(y) # (masked_num, codebook_size)
 
-            # Return the self-supervised loss
-            norm_x = x / torch.norm(x, dim=-1, keepdim=True) # (B, C, T, patch_size)
-            norm_feature = feature / torch.norm(feature, dim=-1, keepdim=True) # (B, C, T, d_model)
-            gram_x = torch.einsum('bcmd,bcnd->bcmn', norm_x, norm_x) # (B, C, T, T)
-            gram_feature = torch.einsum('bcmd,bcnd->bcmn', norm_feature, norm_feature) # (B, C, T, T)
-            loss = F.mse_loss(gram_x, gram_feature, reduction='sum') / (B*C)
-            return y, idx, loss
+            return y, idx
        
         elif self.task_name == 'anomaly_detection':
             y = y.transpose(1, 2) # (B, T+1, C', d_model)
+            y = y.contiguous().view(-1, *y.shape[2:])
             y = self.decoder(y).squeeze(2) # (B, T+1, d_model)
             y = self.activation(y) # (B, T+1, d_model)
             y = y[:, 0, :] # (B, d_model)
