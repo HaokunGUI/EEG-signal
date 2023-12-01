@@ -70,11 +70,11 @@ class BERT(nn.Module):
             self.activation = self._get_activation_fn(activation)
             self.final_projector = nn.Linear(d_model, codebook_size)
         elif task_name == 'anomaly_detection':
-            self.decoder = nn.Conv1d(in_channels=hidden_channels,
+            self.decoder_ad = nn.Conv1d(in_channels=hidden_channels,
                                      out_channels=1,
                                      kernel_size=1)
             self.activation = self._get_activation_fn(activation)
-            self.final_projector = nn.Linear(d_model, 1)
+            self.final_projector_ad = nn.Linear(d_model, 1)
         else:
             raise RuntimeError(f"task_name should be ssl/anomaly_detection, not {task_name}")
         
@@ -130,7 +130,7 @@ class BERT(nn.Module):
         # Decoder
         if self.task_name == 'ssl':
             # Get the idx
-            idx = self.quantizer(x.reshape(-1, *x.shape[2:])) # (B*C, T, 1)
+            idx = self.quantizer(x.view(-1, *x.shape[2:])) # (B*C, T, 1)
             idx = idx[mask].squeeze(-1) # (masked_num)
 
             # Get the prediction
@@ -151,11 +151,12 @@ class BERT(nn.Module):
         elif self.task_name == 'anomaly_detection':
             y = y.transpose(1, 2) # (B, T+1, C', d_model)
             y = y.contiguous().view(-1, *y.shape[2:])
-            y = self.decoder(y).squeeze(2) # (B, T+1, d_model)
+            y = self.decoder_ad(y).squeeze(1) # (B*(T+1), d_model)
+            y = y.view(B, -1, y.shape[-1]) # (B, T+1, d_model)
             y = self.activation(y) # (B, T+1, d_model)
             y = y[:, 0, :] # (B, d_model)
             y = self.linear_dropout(y)
-            y = self.final_projector(y) # (B, 1)
+            y = self.final_projector_ad(y) # (B, 1)
             return y
         else:
             raise RuntimeError(f"task_name should be ssl/anomaly_detection, not {self.task_name}")

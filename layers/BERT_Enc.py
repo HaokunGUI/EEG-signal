@@ -23,12 +23,14 @@ class Trans_Conv(nn.Module):
     def forward(self, x: torch.Tensor):
         # x: (B, C, T, d_model)
         B, C, T, D = x.shape
-        x = x.reshape(B*C, T, D) # (B*C, T, d_model)
+        x = x.contiguous().view(B*C, T, D) # (B*C, T, d_model)
         x = self.transformer(x) # (B*C, T, d_model)
-        x = x.reshape(B, C, T, D) # (B, C, T, d_model)
-        y = x.transpose(1, 2).reshape(-1, C, D) # (B*T, C, d_model)
+        x = x.view(B, C, T, D) # (B, C, T, d_model)
+        y = x.transpose(1, 2)
+        y = y.contiguous().view(-1, C, D) # (B*T, C, d_model)
         y = self.conv(y) # (B*T, C', d_model)
-        y = y.reshape(B, T, -1, D).transpose(1, 2) # (B, C', T, d_model)
+        y = y.view(B, T, -1, D)
+        y = y.transpose(1, 2) # (B, C', T, d_model)
         y = self.activation(y) # (B, C', T, d_model)
         return y
     
