@@ -1,6 +1,6 @@
 torchrun \
     --standalone \
-    --nproc_per_node=2 \
+    --nproc_per_node=4 \
     run.py \
     --task_name ssl \
     --model BERT \
@@ -13,9 +13,9 @@ torchrun \
     --d_model 256 \
     --hidden_channels 16 \
     --activation "gelu" \
-    --train_batch_size 128 \
-    --test_batch_size 128 \
-    --dropout 0.7 \
+    --train_batch_size 64 \
+    --test_batch_size 64 \
+    --dropout 0.75 \
     --num_workers 8 \
     --mask_type "poisson" \
     --use_scheduler \

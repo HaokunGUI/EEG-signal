@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import argparse
-from utils.utils import compute_mask_indices
 from typing import Callable
 from layers.BERT_Enc import Trans_Conv
 from layers.Quantize import Quantize
@@ -33,13 +32,6 @@ class BERT(nn.Module):
             d_model=d_model,
             max_len=100
         )
-
-        # Aggregation
-        self.agg = nn.Conv1d(
-            in_channels=in_channels,
-            out_channels=hidden_channels,
-            kernel_size=1
-        )
         
         # Transformer Encoder
         self.TOKEN_CLS = torch.normal(mean=0, std=0.1, size=(1, 1, 1, d_model)).cuda()
@@ -65,9 +57,6 @@ class BERT(nn.Module):
                 codebook_num=1
             )
 
-            self.decoder = nn.Conv1d(in_channels=hidden_channels,
-                                     out_channels=in_channels,
-                                     kernel_size=1)
             self.activation = self._get_activation_fn(activation)
             self.final_projector = nn.Linear(d_model, codebook_size)
         elif task_name == 'anomaly_detection':
@@ -109,17 +98,12 @@ class BERT(nn.Module):
             y[:, 1:, :][mask] = random_sample
             y = y.view(B, C, *y.shape[1:]) # (B, C, T+1, d_model)
 
-        y = y.transpose(1, 2)
-        y = y.contiguous().view(-1, C, y.shape[-1]) # (B*(T+1), C, d_model)
-        y = self.agg(y) # (B*(T+1), C', d_model)
-        y = y.view(B, -1, self.hidden_channels, y.shape[-1]) # (B, T+1, C', d_model)
-        y = y.transpose(1, 2) # (B, C', T+1, d_model)
-        y = y.contiguous().view(-1, *y.shape[2:]) # (B*C', T+1, d_model)
+        y = y.view(-1, *y.shape[2:])
         pos_embed = self.pos_embed(y) # (B*C', T+1, d_model)
         y = y + pos_embed
 
         # Transformer Encoder
-        y = y.view(B, self.hidden_channels, *y.shape[1:]) # (B, C', T+1, d_model)
+        y = y.view(B, -1, *y.shape[1:]) # (B, C', T+1, d_model)
         for encoder in self.encoder:
             y = encoder(y) # (B, C', T+1, d_model)
         
@@ -130,16 +114,9 @@ class BERT(nn.Module):
             idx = idx[mask].squeeze(-1) # (masked_num)
 
             # Get the prediction
-            y = y.transpose(1, 2) # (B, T+1, C', d_model)
-            y = y.contiguous().view(-1, *y.shape[2:]) # (B*(T+1), C', d_model)
-            y = self.decoder(y) # (B(*(T+1), C, d_model)
-            y = y.view(B, -1, *y.shape[1:]) # (B, T+1, C, d_model)
-            y = y.transpose(1, 2) # (B, C, T+1, d_model)
-            y = self.activation(y) # (B, C, T+1, d_model)
             y = y[:, :, 1:, :] # (B, C, T, d_model)
-            y = y.contiguous().view(-1, *y.shape[2:]) # (B*C, T, d_model)
+            y = y.view(-1, *y.shape[2:]) # (B*C, T, d_model)
             y = y[mask] # (masked_num, d_model)
-            y = self.linear_dropout(y)
             y = self.final_projector(y) # (masked_num, codebook_size)
 
             return y, idx
@@ -171,7 +148,6 @@ class BERT(nn.Module):
         
         # sort noise for each sample
         ids_shuffle = torch.argsort(noise, dim=1)  # ascend: small is keep, large is remove
-        ids_restore = torch.argsort(ids_shuffle, dim=1)
 
         # create mask
         mask = torch.ones([N, L], dtype=bool, device=device)
