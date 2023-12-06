@@ -1,6 +1,6 @@
 torchrun \
     --standalone \
-    --nproc_per_node=2 \
+    --nproc_per_node=4 \
     run.py \
     --task_name anomaly_detection \
     --model BERT \
@@ -16,7 +16,7 @@ torchrun \
     --linear_dropout 0.75 \
     --train_batch_size 64 \
     --test_batch_size 64 \
-    --dropout 0.3 \
+    --dropout 0.7 \
     --num_workers 8 \
     --use_scheduler \
     --balanced \

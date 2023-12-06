@@ -98,6 +98,8 @@ if __name__ == '__main__':
     parser.add_argument('--enc_type', type=str, default='rel', help='Encoder type, options:[abs, rel]')
     parser.add_argument('--linear_dropout', type=float, default=0.5, help='linear dropout ratio')
     parser.add_argument('--hidden_channels', type=int, default=16, help='hidden channels of conv')
+    parser.add_argument('--d_layers', type=int, default=3, help='Number of decoder layers.')
+    parser.add_argument('--global_pool', action='store_true', default=False, help='global pool or not')
 
     # quantization
     parser.add_argument('--codebook_item', type=int, default=512, help='number of embedding vectors')
