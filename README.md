@@ -19,3 +19,12 @@ VQ_BERT_231124_123819 temp 5 lamda * (1 - nn.Sigmoid()(torch.max(x, dim=-1, keep
 - ssl/VQ_BERT/VQ_BERT_231121_205431: tokenizer + LN/ input - IN
 VQ_BERT_231122_151412 fix & max
 VQ_BERT_231122_175339 fix & random init & max
+
+BERT
+- ssl/BERT/BERT_231201_012705: transformer + conv1d
+BERT_231201_141353 cls
+BERT_231201_152935 max
+BERT_231201_163636 mean
+
+- BERT_231205_224117: transformer + itranformer
+BERT_231206_145943 cls

@@ -52,7 +52,7 @@ if __name__ == '__main__':
 
     # data loader
     parser.add_argument('--dataset', type=str, default='TUSZ', help='dataset type, options:[TUSZ]')
-    parser.add_argument('--root_path', type=str, default='/data/guihaokun/resample/tuh_eeg_serizure/', help='root path of the data file')
+    parser.add_argument('--root_path', type=str, default='/data/guihaokun/resample/tuh_eeg_seizure/', help='root path of the data file')
     parser.add_argument('--marker_dir', type=str, default='/home/guihaokun/Time-Series-Pretrain/data', help='marker dir')
     parser.add_argument('--data_augment', action='store_true', help='use data augment or not', default=False)
     parser.add_argument('--normalize', action='store_true', help='normalize data or not', default=False)
@@ -110,6 +110,7 @@ if __name__ == '__main__':
     parser.add_argument('--min_space', type=int, default=1, help='min space between mask')
     parser.add_argument('--mask_dropout', type=float, default=0.0, help='mask dropout ratio')
     parser.add_argument('--mask_type', type=str, default='poisson', help='mask type, options:[static, uniform, normal, poisson]')
+    parser.add_argument('--lm', type=int, default=3, help='lm of poisson mask')
 
     # optimization
     parser.add_argument('--num_epochs', type=int, default=60, help='train epochs')
@@ -119,6 +120,11 @@ if __name__ == '__main__':
     parser.add_argument('--max_norm', type=float, default=1.0, help='max norm of grad')
     parser.add_argument('--use_scheduler', action='store_true', default=False, help='use scheduler or not')
     parser.add_argument('--warmup_epochs', type=int, default=20, help='warmup epochs')
+
+    # SimMTM
+    parser.add_argument('--temperature', type=float, default=0.1, help='temperature of softmax')
+    parser.add_argument('--positive_nums', type=int, default=2, help='positive nums of contrastive learning')
+    parser.add_argument('--dimension', type=int, default=64, help='dimension of SimMTM')
 
     # GPU
     parser.add_argument('--use_gpu', type=bool, default=True, help='use gpu')

@@ -11,6 +11,7 @@ import pyedflib
 import h5py
 
 def resample_all(raw_edf_dir, save_dir, freq:int=None):
+    os.makedirs(save_dir, exist_ok=True)
     edf_files = []
     for path, subdirs, files in os.walk(raw_edf_dir):
         for name in files:
@@ -35,7 +36,7 @@ def resample_all(raw_edf_dir, save_dir, freq:int=None):
                 edf_fn, False, f.getSignalLabels(), INCLUDED_CHANNELS
             )
             signals = getEDFsignals(f)
-            signal_array = np.array(signals[orderedChannels, :])
+            signal_array = np.array(signals[orderedChannels, :]).copy()
 
             ordered_channel_freqs = set()
             for channel in orderedChannels:
@@ -45,6 +46,9 @@ def resample_all(raw_edf_dir, save_dir, freq:int=None):
 
             if len(ordered_channel_freqs) != 1:
                 resample = True
+                print('resample in file:', edf_fn)
+            else:
+                resample = False
             if resample:
                 signal_array = resampleData(
                     signal_array,
@@ -53,11 +57,11 @@ def resample_all(raw_edf_dir, save_dir, freq:int=None):
                 )
 
             with h5py.File(save_fn, "w") as hf:
-                hf.create_dataset("resample_signal", data=signal_array)
+                hf.create_dataset("resample_signal", data=signal_array.copy())
                 hf.create_dataset("resample_freq", data=freq)
 
         except Exception as e:
-            print("Error occur:", str(e))
+            print("Error occur:", str(e), 'fail file number:', len(failed_files))
             failed_files.append(edf_fn)
 
     print("DONE. {} files failed.".format(len(failed_files)))
@@ -78,7 +82,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--save_dir",
         type=str,
-        default='/data/guihaokun/resample/tuh_eeg_serizure',
+        default='/data/guihaokun/resample/tuh_eeg_seizure_2',
         help="Full path to dir to save resampled signals.",
     )
     args = parser.parse_args()

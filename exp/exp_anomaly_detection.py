@@ -97,12 +97,12 @@ class Exp_Anomaly_Detection(Exp_Basic):
                 else:
                     weight_decay = self.args.weight_decay
                     
-                if any([f in name for f in ['final_projector', 'decoder']]):
+                if any([f in name for f in ['final_projector_ad', 'decoder_ad']]):
                     param_group = {'params': param, 'lr': self.args.learning_rate, 'weight_decay': weight_decay}
                     params.append(param_group)
-                else:
-                    param_group = {'params': param, 'lr': self.args.learning_rate*0.1, 'weight_decay': weight_decay}
-                    params.append(param_group)
+                # else:
+                #     param_group = {'params': param, 'lr': self.args.learning_rate*0.1, 'weight_decay': weight_decay}
+                #     params.append(param_group)
                 
             model_optim = optim.AdamW(params)
         else:
@@ -178,8 +178,9 @@ class Exp_Anomaly_Detection(Exp_Basic):
 
         path = self.logging_dir
         checkpoint_dir = os.path.join(path, 'checkpoint')
-        os.makedirs(checkpoint_dir, exist_ok=True)
-        os.makedirs(os.path.join(self.logging_dir, 'graph'), exist_ok=True)
+        if self.device == 0:
+            os.makedirs(checkpoint_dir, exist_ok=True)
+            os.makedirs(os.path.join(self.logging_dir, 'graph'), exist_ok=True)
 
         args_file = os.path.join(self.logging_dir, 'args.json')
         if self.device == 0:

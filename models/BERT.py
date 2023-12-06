@@ -149,12 +149,9 @@ class BERT(nn.Module):
             return y, idx
        
         elif self.task_name == 'anomaly_detection':
-            y = y.transpose(1, 2) # (B, T+1, C', d_model)
-            y = y.contiguous().view(-1, *y.shape[2:])
-            y = self.decoder_ad(y).squeeze(1) # (B*(T+1), d_model)
-            y = y.view(B, -1, y.shape[-1]) # (B, T+1, d_model)
-            y = self.activation(y) # (B, T+1, d_model)
-            y = y[:, 0, :] # (B, d_model)
+            y = torch.mean(y[:, :, 1:, :], dim=2).squeeze(2) # (B, C', d_model)
+            y = self.decoder_ad(y).squeeze(1) # (B, d_model)
+            y = self.activation(y) # (B, d_model)
             y = self.linear_dropout(y)
             y = self.final_projector_ad(y) # (B, 1)
             return y

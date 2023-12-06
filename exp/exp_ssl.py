@@ -31,7 +31,7 @@ class Exp_SSL(Exp_Basic):
         # model init
         model = self.model_dict[self.args.model].Model(self.args).cuda()
         if self.args.use_gpu:
-            if self.args.model in ['DCRNN', 'BERT']:
+            if self.args.model in ['DCRNN', 'BERT', 'SimMTM']:
                 model = DDP(model, device_ids=[self.device])
             elif self.args.model in ['VQ_BERT']:
                 model = DDP(model, device_ids=[self.device], find_unused_parameters=True)
@@ -62,7 +62,7 @@ class Exp_SSL(Exp_Basic):
     def _select_optimizer(self):
         if self.args.model in ['DCRNN']:
             model_optim = optim.Adam(self.model.parameters(), lr=self.args.learning_rate, weight_decay=self.args.weight_decay)
-        elif self.args.model in ['VQ_BERT', 'BERT']:
+        elif self.args.model in ['VQ_BERT', 'BERT', 'SimMTM']:
             params = []
             for name, param in self.model.named_parameters():
                 if ('bias' in name) or ('layer_norm' in name) or ('ln' in name):
@@ -78,12 +78,14 @@ class Exp_SSL(Exp_Basic):
             criterion = loss_fn(standard_sclar=None, loss_fn=self.args.loss_fn, is_tensor=True, mask_val=0.)
         elif self.args.model in ['VQ_BERT', 'BERT']:
             criterion = nn.CrossEntropyLoss().to(self.device)
+        elif self.args.model in ['SimMTM']:
+            criterion = None
         return criterion
     
     def _select_scheduler(self, optimizer):
         if self.args.model in ['DCRNN']:
             scheduler = CosineAnnealingLR(optimizer, T_max=self.args.num_epochs)
-        elif self.args.model in ['VQ_BERT', 'BERT']:
+        elif self.args.model in ['VQ_BERT', 'BERT', 'SimMTM']:
             scheduler1 = LinearLR(optimizer, start_factor=0.5, total_iters=self.args.warmup_epochs)
             scheduler2 = CosineAnnealingLR(optimizer, T_max=self.args.num_epochs - self.args.warmup_epochs)
             scheduler = SequentialLR(optimizer, [scheduler1, scheduler2], milestones=[self.args.warmup_epochs])
@@ -128,6 +130,8 @@ class Exp_SSL(Exp_Basic):
                 elif self.args.model in ['BERT']:
                     pred, label = self.model(x)
                     loss = self.criterion(pred, label).to(self.device)
+                elif self.args.model in ['SimMTM']:
+                    loss, _, _, _, _, _, _ = self.model(x)
                 else:
                     raise NotImplementedError
                 loss_val = loss.item()
@@ -144,8 +148,9 @@ class Exp_SSL(Exp_Basic):
 
         path = self.logging_dir
         checkpoint_dir = os.path.join(path, 'checkpoint')
-        os.makedirs(checkpoint_dir, exist_ok=True)
-        os.makedirs(os.path.join(self.logging_dir, 'graph'), exist_ok=True)
+        if self.device == 0:
+            os.makedirs(checkpoint_dir, exist_ok=True)
+            os.makedirs(os.path.join(self.logging_dir, 'graph'), exist_ok=True)
 
         args_file = os.path.join(self.logging_dir, 'args.json')
         if self.device == 0:
@@ -226,6 +231,8 @@ class Exp_SSL(Exp_Basic):
                     elif self.args.model in ['BERT']:
                         pred, label = self.model(x)
                         loss = self.criterion(pred, label).to(self.device)
+                    elif self.args.model in ['SimMTM']:
+                        loss, _, _, _, _, _, _ = self.model(x)
                     else:
                         raise NotImplementedError
                     
@@ -300,6 +307,8 @@ class Exp_SSL(Exp_Basic):
                 elif self.args.model in ['BERT']:
                     pred, label = self.model(x)
                     loss = self.criterion(pred, label).to(self.device)
+                elif self.args.model in ['SimMTM']:
+                    loss, _, _, _, _, _, _ = self.model(x)
                 else:
                     raise NotImplementedError
                 
