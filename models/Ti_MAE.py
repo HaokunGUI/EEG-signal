@@ -25,13 +25,13 @@ class Ti_MAE(nn.Module):
         
         self.pos_embed = PositionalEmbedding(
             d_model=embed_dim,
-            max_len=series_len//patch_size,
+            max_len=series_len//patch_size+1,
         )
 
         self.cls_token = nn.Parameter(torch.normal(0, 0.1, (1, 1, embed_dim)))
         self.mask_token = nn.Parameter(torch.normal(0, 0.1, (1, 1, decoder_embed_dim)))
 
-        self.encoders = nn.TransformerEncoder(
+        self.encoder = nn.TransformerEncoder(
             encoder_layer=nn.TransformerEncoderLayer(
                 d_model=embed_dim,
                 nhead=n_head,
@@ -48,10 +48,10 @@ class Ti_MAE(nn.Module):
 
             self.decoder_pos_embed = PositionalEmbedding(
                 d_model=decoder_embed_dim,
-                max_len=series_len//patch_size,
+                max_len=series_len//patch_size+1,
             )
 
-            self.decoders = nn.TransformerEncoder(
+            self.decoder = nn.TransformerEncoder(
                 encoder_layer=nn.TransformerEncoderLayer(
                     d_model=decoder_embed_dim,
                     nhead=n_head,
@@ -87,17 +87,17 @@ class Ti_MAE(nn.Module):
         # embed_patch
         x = self.patch_embed(x) # (B, patch_num, embed_dim)
         # add pos embed w/o cls
-        x = x + self.pos_embed(x)[:, 1:, :] # (B, patch_num, embed_dim)
+        pos_embed = self.pos_embed(torch.zeros(x.shape[0], x.shape[1]+1, x.shape[2], device=x.device))
+        x = x + pos_embed[:, 1:, :] # (B, patch_num, embed_dim)
         # random masking
         x, mask, ids_restore = self.random_masking(x, mask_ratio)
         # append cls token
-        cls_token = self.cls_token + self.pos_embed(x)[:, :1, :]
+        cls_token = self.cls_token + pos_embed[:, :1, :]
         cls_tokens = cls_token.expand(x.shape[0], -1, -1)
         x = torch.cat((cls_tokens, x), dim=1) # (B, patch_num+1, embed_dim)
 
         # apply the transformer blocks
-        for encode in self.encoders:
-            x = encode(x)
+        x = self.encoder(x)
         
         return x, mask, ids_restore
     
@@ -114,8 +114,7 @@ class Ti_MAE(nn.Module):
         # add pos embed
         x = x + self.decoder_pos_embed(x)
         # apply the transformer blocks
-        for decode in self.decoders:
-            x = decode(x)
+        x = self.decoder(x)
         # predict the masked tokens
         x = self.decoder_pred(x[:, 1:, :])
 
@@ -140,8 +139,7 @@ class Ti_MAE(nn.Module):
         x = torch.cat((cls_tokens, x), dim=1) # (B, patch_num+1, embed_dim)
         x = x + self.pos_embed(x) # (B, patch_num, embed_dim)
         x = self.pos_dropout(x)
-        for encode in self.encoders:
-            x = encode(x)
+        x = self.encoder(x)
         
         if self.global_pool:
             x = x[:, 1:, :].mean(dim=1)
@@ -188,7 +186,7 @@ class Model(nn.Module):
             in_chans=args.num_nodes,
             embed_dim=args.d_model,
             mask_ratio=args.mask_ratio,
-            n_head=args.n_head,
+            n_head=8,
             dropout=args.dropout,
             linear_dropout=args.linear_dropout,
             e_layers=args.e_layers,

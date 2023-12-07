@@ -1,6 +1,6 @@
 import os
 import torch
-from models import TimesNet, DCRNN, VQ_BERT, BERT, SimMTM
+from models import TimesNet, DCRNN, VQ_BERT, BERT, SimMTM, Ti_MAE
 from tensorboardX import SummaryWriter
 from utils.tools import WriterFilter
 import datetime
@@ -15,6 +15,7 @@ class Exp_Basic(object):
             'VQ_BERT': VQ_BERT,
             'BERT': BERT,
             'SimMTM': SimMTM,
+            'Ti_MAE': Ti_MAE,
         }
         self.device = self._acquire_device()
         self.model = self._build_model()

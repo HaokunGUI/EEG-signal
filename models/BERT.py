@@ -60,7 +60,7 @@ class BERT(nn.Module):
             self.activation = self._get_activation_fn(activation)
             self.final_projector = nn.Linear(d_model, codebook_size)
         elif task_name == 'anomaly_detection':
-            self.decoder_ad = nn.Conv1d(in_channels=hidden_channels,
+            self.decoder_ad = nn.Conv1d(in_channels=in_channels,
                                      out_channels=1,
                                      kernel_size=1)
             self.activation = self._get_activation_fn(activation)
