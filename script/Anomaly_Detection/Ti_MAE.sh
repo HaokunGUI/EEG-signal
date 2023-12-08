@@ -2,21 +2,21 @@ torchrun \
     --standalone \
     --nproc_per_node=2 \
     run.py \
-    --task_name ssl \
+    --task_name anomaly_detection \
     --model Ti_MAE \
     --learning_rate 1e-3 \
     --normalize \
     --patience 0 \
-    --num_epochs 150 \
+    --num_epochs 60 \
     --e_layers 2 \
-    --d_layers 1 \
     --d_model 256 \
     --activation "gelu" \
     --train_batch_size 128 \
     --test_batch_size 128 \
     --dropout 0.3 \
-    --linear_dropout 0.3 \
-    --mask_ratio 0.3 \
+    --linear_dropout 0.5 \
     --num_workers 8 \
     --use_scheduler \
-    --warmup_epochs 20
+    --balanced \
+    --weight_decay 1e-4 \
+    --pretrained_path "/home/guihaokun/Time-Series-Pretrain/logging/ssl/Ti_MAE/Ti_MAE_231207_165555/checkpoint/last.pth.tar"

@@ -26,5 +26,8 @@ BERT_231201_141353 cls
 BERT_231201_152935 max
 BERT_231201_163636 mean
 
-- BERT_231205_224117: transformer + itranformer
-BERT_231206_145943 cls
+- BERT_231205_224117: transformer + itranformer 0.75
+BERT_231208_141332 cls
+
+- BERT_231207_171122: transformer + itransformer 0.3
+BERT_231208_114750 cls

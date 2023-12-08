@@ -16,7 +16,7 @@ torchrun \
     --linear_dropout 0.75 \
     --train_batch_size 64 \
     --test_batch_size 64 \
-    --dropout 0.7 \
+    --dropout 0.3 \
     --num_workers 8 \
     --use_scheduler \
     --balanced \

@@ -34,7 +34,7 @@ class BERT(nn.Module):
         )
         
         # Transformer Encoder
-        self.TOKEN_CLS = torch.normal(mean=0, std=0.1, size=(1, 1, 1, d_model)).cuda()
+        self.TOKEN_CLS = torch.normal(mean=0, std=0.02, size=(1, 1, 1, d_model)).cuda()
         self.TOKEN_CLS.requires_grad = False
         self.register_buffer("CLS", self.TOKEN_CLS)
         
@@ -93,7 +93,7 @@ class BERT(nn.Module):
                 device=x.device,
             )
             masked_num = mask.sum() #[bs]
-            random_sample = torch.normal(mean=0, std=0.1, size=(masked_num, self.d_model)).to(x.device) #[bs, masked_num, D]
+            random_sample = torch.normal(mean=0, std=0.02, size=(masked_num, self.d_model)).to(x.device) #[bs, masked_num, D]
             y = y.view(B*C, *y.shape[2:]) # (B*C, T+1, d_model)
             y[:, 1:, :][mask] = random_sample
             y = y.view(B, C, *y.shape[1:]) # (B, C, T+1, d_model)
@@ -122,7 +122,8 @@ class BERT(nn.Module):
             return y, idx
        
         elif self.task_name == 'anomaly_detection':
-            y = torch.mean(y[:, :, 1:, :], dim=2).squeeze(2) # (B, C', d_model)
+            # y = torch.mean(y[:, :, 1:, :], dim=2).squeeze(2) # (B, C', d_model)
+            y = y[:, :, 0, :] # (B, C', d_model)
             y = self.decoder_ad(y).squeeze(1) # (B, d_model)
             y = self.activation(y) # (B, d_model)
             y = self.linear_dropout(y)

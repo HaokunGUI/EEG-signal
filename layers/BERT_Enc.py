@@ -82,6 +82,8 @@ class Trans_Conv(nn.Module):
         self.dropout_2 = nn.Dropout(dropout)
         self.dropout_3 = nn.Dropout(dropout)
 
+        self.activation = self._get_activation_fn(activation)
+
     
     def forward(self, x: torch.Tensor):
         # x: (B, C, T, d_model)
@@ -92,9 +94,11 @@ class Trans_Conv(nn.Module):
         x = x.contiguous().view(B*C, T, D)
         x = self.attn_1(x, x, x)[0]
         x = x.view(B, C, T, D) # (B, C, T, d_model)
-        x = x + resident
         x = self.dropout_1(x)
+        x = x + resident
         x = self.ln_1(x)
+
+        x = self.activation(x) # (B, C, T, d_model)
 
         # fusion the feature
         resident = x
@@ -103,8 +107,8 @@ class Trans_Conv(nn.Module):
         x = self.attn_2(x, x, x)[0] # (B*T, C, d_model)
         x = x.view(B, T, -1, D)
         x = x.transpose(1, 2) # (B, C, T, d_model)
-        x = x + resident
         x = self.dropout_2(x)
+        x = x + resident
         x = self.ln_2(x) # (B, C, T, d_model)
 
         # feed forward
@@ -112,8 +116,8 @@ class Trans_Conv(nn.Module):
         x = x.contiguous().view(B*C, T, D)
         x = self.ffn(x)
         x = x.view(B, C, T, D)
-        x = x + resident
         x = self.dropout_3(x)
+        x = x + resident
         x = self.ln_3(x)
 
         return x

@@ -39,7 +39,7 @@ class Exp_Anomaly_Detection(Exp_Basic):
         if self.args.use_gpu:
             if self.args.model in ['VQ_BERT']:
                 model = DDP(model, device_ids=[self.device], find_unused_parameters=True)
-            elif self.args.model in ['DCRNN', 'TimesNet', 'BERT']:
+            elif self.args.model in ['DCRNN', 'TimesNet', 'BERT', 'Ti_MAE']:
                 model = nn.DataParallel(model, device_ids=[self.device])
         if self.args.use_pretrained:
             load_model_checkpoint(self.args.pretrained_path, model, map_location=self.device)
@@ -85,7 +85,7 @@ class Exp_Anomaly_Detection(Exp_Basic):
         return data_set, data_loader
 
     def _select_optimizer(self):
-        if self.args.model in ['VQ_BERT', 'BERT']:
+        if self.args.model in ['VQ_BERT', 'BERT', 'Ti_MAE']:
             params = []
             for name, param in self.model.named_parameters():
                 # only update the parameters that are not frozen
@@ -100,9 +100,9 @@ class Exp_Anomaly_Detection(Exp_Basic):
                 if any([f in name for f in ['final_projector_ad', 'decoder_ad']]):
                     param_group = {'params': param, 'lr': self.args.learning_rate, 'weight_decay': weight_decay}
                     params.append(param_group)
-                # else:
-                #     param_group = {'params': param, 'lr': self.args.learning_rate*0.1, 'weight_decay': weight_decay}
-                #     params.append(param_group)
+                else:
+                    param_group = {'params': param, 'lr': self.args.learning_rate*0.1, 'weight_decay': weight_decay}
+                    params.append(param_group)
                 
             model_optim = optim.AdamW(params)
         else:
@@ -110,7 +110,7 @@ class Exp_Anomaly_Detection(Exp_Basic):
         return model_optim
 
     def _select_criterion(self):
-        if self.args.model in ['DCRNN', 'VQ_BERT', 'TimesNet', 'BERT']:
+        if self.args.model in ['DCRNN', 'VQ_BERT', 'TimesNet', 'BERT', 'Ti_MAE']:
             criterion = nn.BCEWithLogitsLoss().cuda()
         # elif self.args.model in ['TimesNet']:
             # criterion = sigmoid_focal_loss
@@ -152,7 +152,7 @@ class Exp_Anomaly_Detection(Exp_Basic):
                 if self.args.model in ['DCRNN']:
                     seq_len = torch.ones(x.shape[0], dtype=torch.int64).cuda() * self.args.input_len
                     y_pred = self.model(x, seq_len, supports)
-                elif self.args.model in ['TimesNet', 'VQ_BERT', 'BERT']:
+                elif self.args.model in ['TimesNet', 'VQ_BERT', 'BERT', 'Ti_MAE']:
                     y_pred = self.model(x)
                 else:
                     pass
@@ -253,7 +253,7 @@ class Exp_Anomaly_Detection(Exp_Basic):
                         y_pred = self.model(x)
                         # loss = self.criterion(y_pred, y, reduction='mean')
                         loss = self.criterion(y_pred, y)
-                    elif self.args.model in ['VQ_BERT', 'BERT']:
+                    elif self.args.model in ['VQ_BERT', 'BERT', 'Ti_MAE']:
                         y_pred = self.model(x)
                         loss = self.criterion(y_pred, y)
                     else:
@@ -324,7 +324,7 @@ class Exp_Anomaly_Detection(Exp_Basic):
                 if self.args.model in ['DCRNN']:
                     seq_len = torch.ones(x.shape[0], dtype=torch.int64).cuda() * self.args.input_len
                     y_pred = self.model(x, seq_len, supports)
-                elif self.args.model in ['TimesNet', 'VQ_BERT', 'BERT']:
+                elif self.args.model in ['TimesNet', 'VQ_BERT', 'BERT', 'Ti_MAE']:
                     y_pred = self.model(x)
                 else:
                     pass
