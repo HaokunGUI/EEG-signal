@@ -31,3 +31,18 @@ BERT_231208_141332 cls
 
 - BERT_231207_171122: transformer + itransformer 0.3
 BERT_231208_114750 cls
+
+- BERT_231208_201200: transformer + activation + itransformer mask_ratio 0.5 dropout 0.3
+BERT_231209_124620 cls linear_dropout 0.75 lr 1e-3
+BERT_231209_135720 cls linear_dropout 0.3 lr 1e-4
+
+- BERT_231209_195611: conformer (-conv1d + agg) mask_ratio 0.5 dropout 0.3
+BERT_231210_125910 cls linear_dropout 0.3
+BERT_231210_141609 cls linear_dropout 0.5
+BERT_231210_201414 cls linear_dropout 0.6
+BERT_231210_235904 cls linear_dropout 0.4
+
+Ti_MAE
+- ssl/Ti_MAE/Ti_MAE_231207_165555
+Ti_MAE_231208_125616 cls
+

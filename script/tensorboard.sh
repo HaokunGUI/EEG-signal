@@ -1,0 +1,1 @@
+ tensorboard --logdir="/home/guihaokun/Time-Series-Pretrain/logging" --port=8080
