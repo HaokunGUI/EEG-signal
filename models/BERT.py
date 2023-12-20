@@ -160,7 +160,7 @@ from layers.Embed import PositionalEmbedding
 class BERT(nn.Module):
     def __init__(self, d_model: int, patch_size: int, dropout: float, in_channels: int, hidden_channels: int, mask_ratio: float,
                  num_layers: int, codebook_size: int, activation: str='gelu', task_name: str='ssl', linear_dropout: float=0.5,
-                 mask_type: str='poisson', split_num: int=4, **kwargs):
+                 mask_type: str='poisson', split_num: int=8, **kwargs):
         
         super(BERT, self).__init__(**kwargs)
 

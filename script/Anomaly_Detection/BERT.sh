@@ -13,7 +13,7 @@ torchrun \
     --d_model 256 \
     --hidden_channels 16 \
     --activation "gelu" \
-    --linear_dropout 0.4 \
+    --linear_dropout 0.7 \
     --train_batch_size 128 \
     --test_batch_size 128 \
     --dropout 0.3 \
@@ -21,4 +21,4 @@ torchrun \
     --use_scheduler \
     --balanced \
     --weight_decay 1e-4 \
-    --pretrained_path "/home/guihaokun/Time-Series-Pretrain/logging/ssl/BERT/BERT_231209_195611/checkpoint/last.pth.tar"
+    --pretrained_path "/home/guihaokun/Time-Series-Pretrain/logging/ssl/BERT/BERT_231216_152126/checkpoint/last.pth.tar"

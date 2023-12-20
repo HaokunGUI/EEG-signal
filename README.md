@@ -42,6 +42,24 @@ BERT_231210_141609 cls linear_dropout 0.5
 BERT_231210_201414 cls linear_dropout 0.6
 BERT_231210_235904 cls linear_dropout 0.4
 
+- BERT_231212_200650： conformer (-conv1d + agg) mask_ratio 0.5 dropout 0.3 agg
+BERT_231213_160514 cls linear_dropout 0.4
+BERT_231213_193935 cls linear_dropout 0.5
+BERT_231213_154210 cls linear_dropout 0.6
+
+- BERT_231214_084320: align
+BERT_231214_224213 cls linear_dropout 0.6
+
+- BERT_231215_200039: agg + align 4
+BERT_231216_123945 cls linear_dropout 0.6
+
+- BERT_231216_152126: agg + align 1
+BERT_231217_123821 cls linear_dropout 0.6
+
+- BERT_231218_173658: agg + align 2
+
+- BERT_231219_163430: agg + align 8
+
 Ti_MAE
 - ssl/Ti_MAE/Ti_MAE_231207_165555
 Ti_MAE_231208_125616 cls

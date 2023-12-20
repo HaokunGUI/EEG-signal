@@ -163,9 +163,16 @@ class Exp_Anomaly_Detection(Exp_Basic):
         y_pred = torch.cat(y_preds, dim=0)
         y_true = torch.cat(y_trues, dim=0)
         
+        y_preds = [torch.zeros_like(y_pred) for _ in range(self.world_size)]
+        y_trues = [torch.zeros_like(y_true) for _ in range(self.world_size)]
+        dist.all_gather(y_preds, y_pred)
+        dist.all_gather(y_trues, y_true)
+        y_preds = torch.cat(y_preds, dim=0)
+        y_trues = torch.cat(y_trues, dim=0)
+        
         acc_metric = BinaryAccuracy().cuda()
-        acc = acc_metric(torch.sigmoid(y_pred), y_true).cpu().item()
-        auroc = self.auroc(torch.sigmoid(y_pred), y_true).cpu().item()
+        acc = acc_metric(torch.sigmoid(y_preds), y_trues).cpu().item()
+        auroc = self.auroc(torch.sigmoid(y_preds), y_trues).cpu().item()
         metrics = {'acc': acc, 'auroc': auroc}
 
         self.model.train()
