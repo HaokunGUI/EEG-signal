@@ -32,7 +32,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--dir_path', type=str, default='/data/guihaokun/project/tuh_eeg_seizure/v2.0.0/edf/')
     parser.add_argument('--h5_dir', type=str, default='/data/guihaokun/resample/tuh_eeg_seizure')
-    parser.add_argument('--time_step', type=int, default=4)
+    parser.add_argument('--time_step', type=int, default=12)
     parser.add_argument('--write_dir', type=str, default='/home/guihaokun/Time-Series-Pretrain/data/file_markers_ssl')
     args = parser.parse_args()
     generate_marker(args.dir_path, args.time_step, args.write_dir, args.h5_dir)

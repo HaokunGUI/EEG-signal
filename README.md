@@ -47,18 +47,60 @@ BERT_231213_160514 cls linear_dropout 0.4
 BERT_231213_193935 cls linear_dropout 0.5
 BERT_231213_154210 cls linear_dropout 0.6
 
+BERT_231220_205032 cls linear_dropout 0.6 * 
+
 - BERT_231214_084320: align
 BERT_231214_224213 cls linear_dropout 0.6
 
 - BERT_231215_200039: agg + align 4
 BERT_231216_123945 cls linear_dropout 0.6
+BERT_231220_184227 cls linear_dropout 0.6 *
 
 - BERT_231216_152126: agg + align 1
 BERT_231217_123821 cls linear_dropout 0.6
+BERT_231220_194835 cls linear_dropout 0.6 *
 
 - BERT_231218_173658: agg + align 2
+BERT_231220_160342 cls linear_dropout 0.6
 
 - BERT_231219_163430: agg + align 8
+BERT_231220_171409 cls linear_dropout 0.6
+
+- BERT_231220_215435: agg + align 1 * 
+BERT_231221_134748 cls linear_dropout 0.6
+
+- BERT_231221_214859: baseline
+BERT_231222_145708 cls linear_dropout 0.6
+
+-----------------------------------------------
+1/2 FFN + MHSA + 1/2 FFN
+
+- BERT_231226_185457: agg4 + align
+BERT_231227_113814 cls linear_dropout 0.6
+
+-----------------------------------------------
+Transformer:
+
+- BERT_231231_015811: agg2 + align
+BERT_231231_124744 cls linear_dropout 0.6  0.9069
+
+- BERT_231230_023558: agg4 
+BERT_231231_124824 cls linear_dropout 0.6  0.8895
+
+- BERT_231230_021432: baseline
+BERT_231231_141224 cls linear_dropout 0.6  0.8799
+
+- BERT_231228_234203: agg8 + align
+BERT_231229_121817 cls linear_dropout 0.6  0.8627
+
+- BERT_231228_004628: agg4 + align
+BERT_231228_224110 cls linear_dropout 0.6  0.8994
+
+- BERT_231231_144036: align
+BERT_240101_013431 cls linear_dropout 0.6 
+BERT_240110_214553 input_len 12
+
+- BERT_240101_013320: agg6 + align
 
 Ti_MAE
 - ssl/Ti_MAE/Ti_MAE_231207_165555

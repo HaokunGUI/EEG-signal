@@ -110,10 +110,11 @@ class Exp_Anomaly_Detection(Exp_Basic):
         return model_optim
 
     def _select_criterion(self):
-        if self.args.model in ['DCRNN', 'VQ_BERT', 'TimesNet', 'BERT', 'Ti_MAE']:
+        if self.args.model in ['DCRNN', 'VQ_BERT', 'BERT', 'Ti_MAE']:
             criterion = nn.BCEWithLogitsLoss().cuda()
-        # elif self.args.model in ['TimesNet']:
+        elif self.args.model in ['TimesNet']:
             # criterion = sigmoid_focal_loss
+            criterion = nn.BCEWithLogitsLoss().cuda()
         else:
             raise NotImplementedError
         return criterion

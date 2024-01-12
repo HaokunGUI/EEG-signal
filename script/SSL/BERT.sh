@@ -1,6 +1,6 @@
 torchrun \
     --standalone \
-    --nproc_per_node=2 \
+    --nproc_per_node=4 \
     run.py \
     --task_name ssl \
     --model BERT \

@@ -1,10 +1,10 @@
 torchrun \
     --standalone \
-    --nproc_per_node=2 \
+    --nproc_per_node=4 \
     run.py \
     --task_name ssl \
     --model Ti_MAE \
-    --learning_rate 1e-3 \
+    --learning_rate 1e-4 \
     --normalize \
     --patience 0 \
     --num_epochs 150 \
@@ -12,11 +12,11 @@ torchrun \
     --d_layers 1 \
     --d_model 256 \
     --activation "gelu" \
-    --train_batch_size 128 \
-    --test_batch_size 128 \
+    --train_batch_size 64 \
+    --test_batch_size 64 \
     --dropout 0.3 \
     --linear_dropout 0.3 \
     --mask_ratio 0.3 \
-    --num_workers 8 \
+    --num_workers 10 \
     --use_scheduler \
     --warmup_epochs 20

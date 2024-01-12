@@ -112,7 +112,7 @@ class Quantize(nn.Module):
         super(Quantize, self).__init__(**kwargs)
         # hyper-parameters
         self.split_num = split_num
-        assert split_num == 8
+        assert split_num == 6
 
         self.projector = torch.nn.init.xavier_normal_(torch.empty(input_dim, vq_dim))
         self.projector = nn.Parameter(self.projector, requires_grad=False)

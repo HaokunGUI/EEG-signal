@@ -25,7 +25,7 @@ class Ti_MAE(nn.Module):
         
         self.pos_embed = PositionalEmbedding(
             d_model=embed_dim,
-            max_len=series_len//patch_size+1,
+            max_len=60*250//patch_size+1,
         )
 
         self.cls_token = nn.Parameter(torch.normal(0, 0.1, (1, 1, embed_dim)))

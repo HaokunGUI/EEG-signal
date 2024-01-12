@@ -42,7 +42,7 @@ def markSeizureSlice(
 ):
     file_path = os.path.join(h5_dir, edf_path.split('/')[-1].split('.edf')[0] + '.h5')
     with h5py.File(file_path, 'r') as f:
-        signal_array = f["resample_signal"][()]
+        signal_array = f["resampled_signal"][()]
         freq = f["resample_freq"][()]
 
     # get seizure times
@@ -99,5 +99,5 @@ if __name__ == '__main__':
         input_dir='/data/guihaokun/processed_data',
         output_dir='/home/guihaokun/Time-Series-Pretrain/data/file_markers_detection',
         raw_data_dir='/data/guihaokun/project/tuh_eeg_seizure/v2.0.0/edf/',
-        clip_size=60,
+        clip_size=12,
     )

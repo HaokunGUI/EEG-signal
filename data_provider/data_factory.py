@@ -28,6 +28,6 @@ def data_provider(args: argparse.Namespace, scalar=None):
             pin_memory=True,
             sampler=DistributedSampler(dataset, shuffle=shuffle) \
                 if args.use_gpu else \
-                RandomSampler(dataset, shuffle=shuffle)
+                RandomSampler(dataset, shuffle=shuffle),
         )
     
