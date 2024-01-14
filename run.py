@@ -2,6 +2,7 @@ import argparse
 import torch
 from exp.exp_anomaly_detection import Exp_Anomaly_Detection
 from exp.exp_ssl import Exp_SSL
+from exp.exp_classification import Exp_Classification
 import torch.multiprocessing
 from utils.tools import ddp_setup, ddp_cleanup, seed_torch
 import os
@@ -20,6 +21,8 @@ def main(args: argparse.Namespace):
         Exp = Exp_Anomaly_Detection
     elif args.task_name == 'ssl':
         Exp = Exp_SSL
+    elif args.task_name == 'classification':
+        Exp = Exp_Classification
     else:
         raise ValueError('task name must be in [anomaly_detection, classification, ssl]')
 
@@ -53,6 +56,7 @@ if __name__ == '__main__':
     # data loader
     parser.add_argument('--dataset', type=str, default='TUSZ', help='dataset type, options:[TUSZ]')
     parser.add_argument('--root_path', type=str, default='/data/guihaokun/resample/tuh_eeg_seizure/', help='root path of the data file')
+    parser.add_argument('--classification_dir', type=str, default='/data/guihaokun/classification/', help='classification dir')
     parser.add_argument('--marker_dir', type=str, default='/home/guihaokun/Time-Series-Pretrain/data', help='marker dir')
     parser.add_argument('--data_augment', action='store_true', help='use data augment or not', default=False)
     parser.add_argument('--normalize', action='store_true', help='normalize data or not', default=False)
@@ -67,6 +71,9 @@ if __name__ == '__main__':
     parser.add_argument('--time_step_len', type=int, default=1, help='time step length')
     parser.add_argument('--use_fft', action='store_true', help='use fft or not', default=False)
     parser.add_argument('--loss_fn', type=str, default='mae', help='loss function, options:[mse, mae]')
+
+    # classification task
+    parser.add_argument('--num_classes', type=int, default=4, help='number of classes')
 
     # detection task
     parser.add_argument('--scale_ratio', type=float, default=1.0, help='scale ratio of train data')

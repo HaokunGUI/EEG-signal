@@ -59,7 +59,16 @@ class Dataset_TUSZ(Dataset):
             self.size = len(self.file_tuples)
 
         elif self.task_name == 'classification':
-            pass
+            file_name = f'{self.split}_{self.input_len}s.h5'
+            file_path = os.path.join(self.args.classification_dir, file_name)
+            with h5py.File(file_path, 'r') as f:
+                self.file_names = f['results'][()]
+                self.paddings = f['paddings'][()]
+                self.labels = f['labels'][()]
+            
+            # for i in range(4):
+            #     print(f'num of class {i}: {np.sum(self.labels == i)}')
+            self.size = len(self.labels)
 
         else:
             raise NotImplementedError
@@ -88,6 +97,8 @@ class Dataset_TUSZ(Dataset):
             # convert to Tensor
             x = torch.Tensor(x)
             y = torch.Tensor(y)
+
+            return x, y, int(self.data_augment and reflect)
         
         elif self.task_name == 'anomaly_detection':
             file_name, label = self.file_tuples[index]
@@ -106,14 +117,18 @@ class Dataset_TUSZ(Dataset):
             # convert to Tensor
             x = torch.Tensor(x)
             y = torch.Tensor([label])
+            return x, y, int(self.data_augment and reflect)
 
         elif self.task_name == 'classification':
-            pass
+            x, padding, y = self.file_names[index], self.paddings[index], self.labels[index]
+            x = torch.Tensor(x)
+            padding = torch.Tensor(padding)
+            y = torch.Tensor([y])
+            return x, y, int(self.data_augment and reflect), padding
 
         else:
             raise NotImplementedError
         
-        return x, y, int(self.data_augment and reflect)
     
 
     def __len__(self) -> int: 

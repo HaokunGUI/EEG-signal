@@ -7,6 +7,8 @@ from layers.BERT_Enc import Trans_Conv
 from layers.Quantize import Quantize
 from layers.Embed import PositionalEmbedding
 
+from typing import Optional
+
 # class BERT(nn.Module):
 #     def __init__(self, d_model: int, patch_size: int, dropout: float, in_channels: int, hidden_channels: int, mask_ratio: float,
 #                  num_layers: int, codebook_size: int, activation: str='gelu', task_name: str='ssl', linear_dropout: float=0.5,
@@ -217,13 +219,19 @@ class BERT(nn.Module):
                                      kernel_size=1)
             self.activation = self._get_activation_fn(activation)
             self.final_projector_ad = nn.Linear(d_model, 1)
+        elif task_name == 'classification':
+            self.decoder_cls = nn.Conv1d(in_channels=in_channels,
+                                        out_channels=1,
+                                        kernel_size=1)
+            self.activation = self._get_activation_fn(activation)
+            self.final_projector_cls = nn.Linear(d_model, 4)
         else:
             raise RuntimeError(f"task_name should be ssl/anomaly_detection, not {task_name}")
         
         self.linear_dropout = nn.Dropout(p=linear_dropout)
         
 
-    def forward(self, x: torch.Tensor):
+    def forward(self, x: torch.Tensor, padding:torch.Tensor=None):
         # x: (B, C, T)
         B, C, T = x.shape
         assert T % self.patch_size == 0, f"Time series length should be divisible by patch_size, not {T} % {self.patch_size}"
@@ -257,7 +265,7 @@ class BERT(nn.Module):
         # Transformer Encoder
         y = y.view(B, -1, *y.shape[1:]) # (B, C', T+1, d_model)
         for encoder in self.encoder:
-            y = encoder(y) # (B, C', T+1, d_model)
+            y = encoder(y, padding) # (B, C', T+1, d_model)
         
         # Decoder
         if self.task_name == 'ssl':
@@ -282,6 +290,15 @@ class BERT(nn.Module):
             y = self.linear_dropout(y)
             y = self.final_projector_ad(y) # (B, 1)
             return y
+        
+        elif self.task_name == 'classification':
+            y = y[:, :, 0, :]
+            y = self.decoder_cls(y).squeeze(1)
+            y = self.activation(y)
+            y = self.linear_dropout(y)
+            y = self.final_projector_cls(y)
+            return y
+        
         else:
             raise RuntimeError(f"task_name should be ssl/anomaly_detection, not {self.task_name}")
 
@@ -329,5 +346,19 @@ class Model(nn.Module):
             mask_ratio=args.mask_ratio,
         )
     
-    def forward(self, x: torch.Tensor):
-        return self.model.forward(x)
+    def forward(self, x: torch.Tensor, padding: Optional[torch.Tensor]=None):
+        '''
+        padding: (B, C, T)
+        '''
+        if padding is not None and self.args.task_name == 'classification':
+            # Find the indices of the first occurrence of 1 in each sequence
+            first_one_indices = torch.argmax((padding == 1).int(), dim=2)
+
+            # Calculate the values to set to 1 for each slice
+            slice_to_set = first_one_indices // self.args.freq
+
+            # Create a mask to identify positions to set to 1
+            padding = torch.arange(padding.size(2) // self.args.freq).cuda() >= slice_to_set.unsqueeze(-1)
+            padding = padding.reshape(-1, self.args.input_len)
+            
+        return self.model.forward(x, padding)

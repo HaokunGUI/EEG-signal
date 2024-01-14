@@ -24,6 +24,8 @@ class TimesBlock(nn.Module):
         self.input_len = args.input_dim
         if args.task_name == 'anomaly_detection':
             self.output_len = 0
+        elif args.task_name == 'classification':
+            self.output_len = 0
         else:
             self.output_len = args.output_dim
         self.k = args.top_k
@@ -91,7 +93,7 @@ class Model(nn.Module):
                 args.d_model * args.input_dim, 1)
         if self.task_name == 'classification':
             self.projection = nn.Linear(
-                args.d_model * args.input_dim, args.num_class)
+                args.d_model * args.input_dim, 4)
 
     def forward(self, x_enc):
         x_enc = x_enc.permute(0, 2, 1)

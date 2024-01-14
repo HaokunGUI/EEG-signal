@@ -69,7 +69,7 @@ class Ti_MAE(nn.Module):
             self.final_projector = nn.Linear(embed_dim, 1, bias=True)
 
 
-    def forward(self, x):
+    def forward(self, x, padding=None):
         if self.task_name == 'ssl':
             latent, mask, ids_restore = self.forward_encoder(x, mask_ratio=self.mask_ratio)
             pred = self.forward_decoder(latent, ids_restore)

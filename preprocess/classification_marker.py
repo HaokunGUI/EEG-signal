@@ -101,7 +101,7 @@ def preprocess(raw_dir: str, processed_data: str, output_dir: str, slice_len: in
     processed_data: path to the resampled data
     slice_len: length of each clip in seconds(12s/60s)
     '''
-    for mode in ('dev', 'test', 'train'):
+    for mode in ["eval"]:
         path_dir = os.path.join(raw_dir, mode)
 
         results = np.empty((0, 19, slice_len * 250))
@@ -123,7 +123,7 @@ def preprocess(raw_dir: str, processed_data: str, output_dir: str, slice_len: in
                 results = np.concatenate((results, result), axis=0)
                 paddings = np.concatenate((paddings, padding), axis=0)
                 labels = np.concatenate((labels, label), axis=0)
-        with h5py.File(os.path.join(output_dir, mode + '.h5'), 'w') as hf:
+        with h5py.File(os.path.join(output_dir, f'{mode}_{slice_len}s.h5'), 'w') as hf:
             hf.create_dataset('results', data=results)
             hf.create_dataset('paddings', data=paddings)
             hf.create_dataset('labels', data=labels)
