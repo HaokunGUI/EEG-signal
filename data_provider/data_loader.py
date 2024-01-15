@@ -63,7 +63,6 @@ class Dataset_TUSZ(Dataset):
             file_path = os.path.join(self.args.classification_dir, file_name)
             with h5py.File(file_path, 'r') as f:
                 self.file_names = f['results'][()]
-                self.paddings = f['paddings'][()]
                 self.labels = f['labels'][()]
             
             # for i in range(4):

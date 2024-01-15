@@ -7,15 +7,14 @@ torchrun \
     --graph_type distance \
     --normalize \
     --use_fft \
-    --learning_rate 1e-3 \
+    --learning_rate 5e-4 \
     --train_batch_size 64 \
     --test_batch_size 64 \
-    --data_augment \
     --patience 0 \
     --pretrained_path "/home/guihaokun/Time-Series-Pretrain/logging/ssl/DCRNN/DCRNN_240109_114255/checkpoint/last.pth.tar"\
-    --dropout 0.5 \
-    --balanced \
+    --dropout 0.7 \
     --use_scheduler \
     --weight_decay 1e-4 \
     --num_workers 10 \
-    --num_epochs 60
+    --num_epochs 60 \
+    --input_len 12
