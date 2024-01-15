@@ -12,8 +12,8 @@ torchrun \
     --test_batch_size 64 \
     --data_augment \
     --patience 0 \
-    --pretrained_path "/home/guihaokun/Time-Series-Pretrain/logging/ssl/DCRNN/DCRNN_240111_112811/checkpoint/last.pth.tar"\
-    --dropout 0.2 \
+    --pretrained_path "/home/guihaokun/Time-Series-Pretrain/logging/ssl/DCRNN/DCRNN_240109_114255/checkpoint/last.pth.tar"\
+    --dropout 0.5 \
     --balanced \
     --use_scheduler \
     --weight_decay 1e-4 \

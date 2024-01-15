@@ -124,7 +124,7 @@ class Dataset_TUSZ(Dataset):
             x = torch.Tensor(x)
             padding = torch.Tensor(padding)
             y = torch.Tensor([y])
-            return x, y, int(self.data_augment and reflect), padding
+            return x, y, int(False), padding
 
         else:
             raise NotImplementedError
