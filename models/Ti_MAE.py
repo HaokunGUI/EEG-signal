@@ -68,8 +68,12 @@ class Ti_MAE(nn.Module):
             self.pos_dropout = nn.Dropout(p=linear_dropout)
             self.final_projector = nn.Linear(embed_dim, 1, bias=True)
 
+        elif self.task_name == 'classification':
+            self.pos_dropout = nn.Dropout(p=linear_dropout)
+            self.final_projector = nn.Linear(embed_dim, 4, bias=True)
 
-    def forward(self, x, padding=None):
+
+    def forward(self, x):
         if self.task_name == 'ssl':
             latent, mask, ids_restore = self.forward_encoder(x, mask_ratio=self.mask_ratio)
             pred = self.forward_decoder(latent, ids_restore)
@@ -78,9 +82,11 @@ class Ti_MAE(nn.Module):
         elif self.task_name == 'anomaly_detection':
             outcome = self.forward_feature(x)
             return outcome
+        elif self.task_name == 'classification':
+            outcome = self.forward_feature(x)
+            return outcome
         else:
             raise NotImplementedError
-
 
     def forward_encoder(self, x: torch.Tensor, mask_ratio: float) -> ...:
         # x: (B, in_chans, series_len)

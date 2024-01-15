@@ -113,10 +113,9 @@ class Exp_Classification(Exp_Basic):
         self.model.eval()
 
         with torch.no_grad():
-            for x, y, _, padding in tqdm(vali_loader, disable=(self.device != 0)):
+            for x, y, _ in tqdm(vali_loader, disable=(self.device != 0)):
                 x = x.float().to(self.device)
                 y = y.to(self.device)
-                padding = padding.to(self.device)
 
                 # get adjmat, supports
                 if self.args.use_graph:
@@ -139,7 +138,7 @@ class Exp_Classification(Exp_Basic):
                 elif self.args.model in ['TimesNet']:
                     y_pred = self.model(x)
                 elif self.args.model in ['VQ_BERT', 'BERT', 'Ti_MAE']:
-                    y_pred = self.model(x, padding)
+                    y_pred = self.model(x)
                 else:
                     pass
 
@@ -193,12 +192,11 @@ class Exp_Classification(Exp_Basic):
 
             with tqdm(train_loader.dataset, desc=f'Epoch: {epoch + 1} / {self.args.num_epochs}', \
                                               disable=(self.device != 0)) as progress_bar:
-                for x, y, augment, padding in train_loader:
+                for x, y, augment in train_loader:
                     model_optim.zero_grad()
                     batch_size = x.size(0)
                     x = x.float().to(self.device)
                     y = y.to(self.device)
-                    padding = padding.to(self.device)
 
                     with torch.no_grad():
                         # get adjmat, supports
@@ -243,7 +241,7 @@ class Exp_Classification(Exp_Basic):
                         # loss = self.criterion(y_pred, y, reduction='mean')
                         loss = self.criterion(y_pred, y.squeeze(-1).long())
                     elif self.args.model in ['VQ_BERT', 'BERT', 'Ti_MAE']:
-                        y_pred = self.model(x, padding)
+                        y_pred = self.model(x)
                         loss = self.criterion(y_pred, y.squeeze(-1).long())
                     else:
                         pass
@@ -290,10 +288,9 @@ class Exp_Classification(Exp_Basic):
         y_trues = []
         y_preds = []
         with torch.no_grad():
-            for x, y, _, padding in tqdm(test_loader, disable=(self.device != 0)):
+            for x, y, _ in tqdm(test_loader, disable=(self.device != 0)):
                 x = x.float().to(self.device)
                 y = y.to(self.device)
-                padding = padding.to(self.device)
 
                 # get adjmat, supports
                 if self.args.use_graph:
@@ -316,7 +313,7 @@ class Exp_Classification(Exp_Basic):
                 elif self.args.model in ['TimesNet']:
                     y_pred = self.model(x)
                 elif self.args.model in ['VQ_BERT', 'BERT', 'Ti_MAE']:
-                    y_pred = self.model(x, padding)
+                    y_pred = self.model(x)
                 else:
                     pass
 

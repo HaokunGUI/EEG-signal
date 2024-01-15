@@ -311,14 +311,13 @@ class Trans_Conv(nn.Module):
         )
 
     
-    def forward(self, x: torch.Tensor, padding:torch.Tensor=None):
+    def forward(self, x: torch.Tensor):
         # x: (B, C, T, d_model)
         B, C, T, D = x.shape
 
         # get the feature
         x = x.contiguous().view(B*C, T, D)
-        mask = torch.concat([torch.zeros(B*C, 1).cuda(), padding], dim=-1)
-        x = self.transformer(x, src_key_padding_mask=mask)
+        x = self.transformer(x)
         x = x.view(B, C, T, D) # (B, C, T, d_model)
 
         return x

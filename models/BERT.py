@@ -231,7 +231,7 @@ class BERT(nn.Module):
         self.linear_dropout = nn.Dropout(p=linear_dropout)
         
 
-    def forward(self, x: torch.Tensor, padding:torch.Tensor=None):
+    def forward(self, x: torch.Tensor):
         # x: (B, C, T)
         B, C, T = x.shape
         assert T % self.patch_size == 0, f"Time series length should be divisible by patch_size, not {T} % {self.patch_size}"
@@ -265,7 +265,7 @@ class BERT(nn.Module):
         # Transformer Encoder
         y = y.view(B, -1, *y.shape[1:]) # (B, C', T+1, d_model)
         for encoder in self.encoder:
-            y = encoder(y, padding) # (B, C', T+1, d_model)
+            y = encoder(y) # (B, C', T+1, d_model)
         
         # Decoder
         if self.task_name == 'ssl':
@@ -346,19 +346,5 @@ class Model(nn.Module):
             mask_ratio=args.mask_ratio,
         )
     
-    def forward(self, x: torch.Tensor, padding: Optional[torch.Tensor]=None):
-        '''
-        padding: (B, C, T)
-        '''
-        if padding is not None and self.args.task_name == 'classification':
-            # Find the indices of the first occurrence of 1 in each sequence
-            first_one_indices = torch.argmax((padding == 1).int(), dim=2)
-
-            # Calculate the values to set to 1 for each slice
-            slice_to_set = first_one_indices // self.args.freq
-
-            # Create a mask to identify positions to set to 1
-            padding = torch.arange(padding.size(2) // self.args.freq).cuda() >= slice_to_set.unsqueeze(-1)
-            padding = padding.reshape(-1, self.args.input_len)
-            
-        return self.model.forward(x, padding)
+    def forward(self, x: torch.Tensor):
+        return self.model.forward(x)

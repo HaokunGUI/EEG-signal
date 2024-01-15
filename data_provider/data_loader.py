@@ -62,7 +62,7 @@ class Dataset_TUSZ(Dataset):
             file_name = f'{self.split}_{self.input_len}s.h5'
             file_path = os.path.join(self.args.classification_dir, file_name)
             with h5py.File(file_path, 'r') as f:
-                self.file_names = f['results'][()]
+                self.clips = f['clips'][()]
                 self.labels = f['labels'][()]
             
             # for i in range(4):
@@ -119,11 +119,10 @@ class Dataset_TUSZ(Dataset):
             return x, y, int(self.data_augment and reflect)
 
         elif self.task_name == 'classification':
-            x, padding, y = self.file_names[index], self.paddings[index], self.labels[index]
+            x, y = self.clips[index], self.labels[index]
             x = torch.Tensor(x)
-            padding = torch.Tensor(padding)
             y = torch.Tensor([y])
-            return x, y, int(False), padding
+            return x, y, int(False)
 
         else:
             raise NotImplementedError
