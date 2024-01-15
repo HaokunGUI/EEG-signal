@@ -62,6 +62,7 @@ def get_seizure(file_path: str, processed_dir: str, clip_len: int) -> tuple:
     df['label'] = df['label'].map(map_dict)
 
     clips = np.empty((0, 19, physical_clip_len))
+    paddings = np.zeros((0, physical_clip_len))
     labels = np.empty(0)
 
     for i, (start_time, stop_time) in enumerate(seizure_time):
@@ -75,21 +76,30 @@ def get_seizure(file_path: str, processed_dir: str, clip_len: int) -> tuple:
                 pre_seizure_end = 0
             
             start_t = max(int(pre_seizure_end + 1), int((start_time - offset) * freq))
-            stop_t = min(int(start_t + ((stop_time - start_time)//clip_len) * physical_clip_len), 
-                           int(stop_time * freq))
+            stop_t = int(stop_time * freq)
 
             signal = signal_array[:, start_t:stop_t]
+            padding_len = physical_clip_len - signal.shape[1] % physical_clip_len
+            signal = np.concatenate([signal, np.zeros((19, padding_len))], axis=1)
+            assert signal.shape[1] % physical_clip_len == 0, 'signal.shape[1] % physical_clip_len != 0'
 
             start_time_step = 0
             
             while start_time_step <= signal.shape[1] - physical_clip_len:
+                # create paddings
+                if start_time_step + physical_clip_len == signal.shape[1]:
+                    padding = np.concatenate([[0]*(physical_clip_len - padding_len), [1]*padding_len], axis=0)
+                else:
+                    padding = np.zeros(physical_clip_len)
+
                 end_time_step = start_time_step + physical_clip_len
                 curr_time_step = signal[:, start_time_step:end_time_step]
                 clips = np.concatenate([clips, curr_time_step.reshape(1, 19, -1)], axis=0)
                 labels = np.concatenate([labels, np.array([label])], axis=0)
+                paddings = np.concatenate([paddings, padding.reshape(1, -1)], axis=0)
                 start_time_step = end_time_step
 
-    return clips, labels
+    return clips, labels, paddings
 
 def preprocess(raw_dir: str, processed_data: str, output_dir: str, slice_len: int):
     '''
@@ -102,13 +112,14 @@ def preprocess(raw_dir: str, processed_data: str, output_dir: str, slice_len: in
 
         results = np.empty((0, 19, slice_len * 250))
         labels = np.empty(0)
+        paddings = np.empty((0, slice_len * 250))
 
         for dir, subdir, files in tqdm(os.walk(path_dir), desc=f"Processing {mode}", unit="file", unit_scale=True):
             for file in files:
                 if not file.endswith('.csv'):
                     continue
                 try:
-                    result, label = get_seizure(os.path.join(dir, file), processed_data, slice_len)
+                    result, label, padding = get_seizure(os.path.join(dir, file), processed_data, slice_len)
                 except:
                     print('File not found: ' + file)
                     continue
@@ -117,6 +128,7 @@ def preprocess(raw_dir: str, processed_data: str, output_dir: str, slice_len: in
 
                 results = np.concatenate((results, result), axis=0)
                 labels = np.concatenate((labels, label), axis=0)
+                paddings = np.concatenate((paddings, padding), axis=0)
 
         if not os.path.exists(output_dir):
             os.mkdir(output_dir)
@@ -124,6 +136,7 @@ def preprocess(raw_dir: str, processed_data: str, output_dir: str, slice_len: in
         with h5py.File(os.path.join(output_dir, f'{mode}_{slice_len}s.h5'), 'w') as hf:
             hf.create_dataset('clips', data=results)
             hf.create_dataset('labels', data=labels)
+            hf.create_dataset('paddings', data=paddings)
     return
 
 if __name__ == '__main__':
