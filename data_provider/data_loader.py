@@ -64,6 +64,7 @@ class Dataset_TUSZ(Dataset):
             with h5py.File(file_path, 'r') as f:
                 self.clips = f['clips'][()]
                 self.labels = f['labels'][()]
+                self.paddings = f['paddings'][()]
             
             # for i in range(4):
             #     print(f'num of class {i}: {np.sum(self.labels == i)}')
@@ -119,9 +120,14 @@ class Dataset_TUSZ(Dataset):
             return x, y, int(self.data_augment and reflect)
 
         elif self.task_name == 'classification':
-            x, y = self.clips[index], self.labels[index]
+            x, y, padding = self.clips[index], self.labels[index], self.paddings[index]
             x = torch.Tensor(x)
             y = torch.Tensor([y])
+
+            if self.scalar is not None:
+                x = self.scalar.transform(x)
+            # set the paddings to 0
+            x[:, padding == 1] = 0
             return x, y, int(False)
 
         else:

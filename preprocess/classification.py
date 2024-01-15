@@ -22,7 +22,6 @@ def get_seizure(file_path: str, processed_dir: str, clip_len: int) -> tuple:
     Args:
     file_path: path to the csv file
     '''
-
     # offset is sure
     offset = 2
 
@@ -61,9 +60,9 @@ def get_seizure(file_path: str, processed_dir: str, clip_len: int) -> tuple:
     df = df[df['label'].isin(map_dict.keys())]
     df['label'] = df['label'].map(map_dict)
 
-    clips = np.empty((0, 19, physical_clip_len))
-    paddings = np.zeros((0, physical_clip_len))
-    labels = np.empty(0)
+    clips = []
+    paddings = []
+    labels = []
 
     for i, (start_time, stop_time) in enumerate(seizure_time):
         select_row = df[(df['start_time'] == start_time) & (df['stop_time'] == stop_time)]
@@ -94,11 +93,10 @@ def get_seizure(file_path: str, processed_dir: str, clip_len: int) -> tuple:
 
                 end_time_step = start_time_step + physical_clip_len
                 curr_time_step = signal[:, start_time_step:end_time_step]
-                clips = np.concatenate([clips, curr_time_step.reshape(1, 19, -1)], axis=0)
-                labels = np.concatenate([labels, np.array([label])], axis=0)
-                paddings = np.concatenate([paddings, padding.reshape(1, -1)], axis=0)
+                clips.append(curr_time_step)
+                labels.append(label)
+                paddings.append(padding)
                 start_time_step = end_time_step
-
     return clips, labels, paddings
 
 def preprocess(raw_dir: str, processed_data: str, output_dir: str, slice_len: int):
@@ -110,9 +108,9 @@ def preprocess(raw_dir: str, processed_data: str, output_dir: str, slice_len: in
     for mode in ["eval", "dev", "train"]:
         path_dir = os.path.join(raw_dir, mode)
 
-        results = np.empty((0, 19, slice_len * 250))
-        labels = np.empty(0)
-        paddings = np.empty((0, slice_len * 250))
+        results = []
+        labels = []
+        paddings = []
 
         for dir, subdir, files in tqdm(os.walk(path_dir), desc=f"Processing {mode}", unit="file", unit_scale=True):
             for file in files:
@@ -123,12 +121,16 @@ def preprocess(raw_dir: str, processed_data: str, output_dir: str, slice_len: in
                 except:
                     print('File not found: ' + file)
                     continue
-                if result.shape[0] == 0:
+                if not result:
                     continue
 
-                results = np.concatenate((results, result), axis=0)
-                labels = np.concatenate((labels, label), axis=0)
-                paddings = np.concatenate((paddings, padding), axis=0)
+                results.extend(result)
+                labels.extend(label)
+                paddings.extend(padding)
+
+        results = np.array(results)
+        labels = np.array(labels)
+        paddings = np.array(paddings)
 
         if not os.path.exists(output_dir):
             os.mkdir(output_dir)
