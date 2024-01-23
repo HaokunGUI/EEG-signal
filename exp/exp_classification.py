@@ -79,11 +79,11 @@ class Exp_Classification(Exp_Basic):
                 else:
                     weight_decay = self.args.weight_decay
                     
-                if any([f in name for f in ['final_projector_ad', 'decoder_ad']]):
+                if any([f in name for f in ['final_projector_cls', 'decoder_cls', 'final_projector']]):
                     param_group = {'params': param, 'lr': self.args.learning_rate, 'weight_decay': weight_decay}
                     params.append(param_group)
                 else:
-                    param_group = {'params': param, 'lr': self.args.learning_rate*0.1, 'weight_decay': weight_decay}
+                    param_group = {'params': param, 'lr': self.args.learning_rate, 'weight_decay': weight_decay}
                     params.append(param_group)
                 
             model_optim = optim.AdamW(params)

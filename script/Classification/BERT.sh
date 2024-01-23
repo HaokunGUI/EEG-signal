@@ -1,10 +1,10 @@
 torchrun \
     --standalone \
-    --nproc_per_node=4 \
+    --nproc_per_node=2 \
     run.py \
     --task_name classification \
     --model BERT \
-    --learning_rate 1e-3 \
+    --learning_rate 1e-4 \
     --normalize \
     --patience 0 \
     --num_epochs 60 \
@@ -13,12 +13,12 @@ torchrun \
     --d_model 256 \
     --hidden_channels 16 \
     --activation "gelu" \
-    --linear_dropout 0.6 \
-    --train_batch_size 64 \
-    --test_batch_size 64 \
+    --linear_dropout 0.0 \
+    --train_batch_size 128 \
+    --test_batch_size 128 \
     --dropout 0.3 \
-    --num_workers 8 \
+    --num_workers 16 \
     --use_scheduler \
-    --balanced \
     --weight_decay 1e-4 \
-    --pretrained_path "/home/guihaokun/Time-Series-Pretrain/logging/ssl/BERT/BERT_231216_152126/checkpoint/last.pth.tar"
+    --pretrained_path "/home/guihaokun/Time-Series-Pretrain/logging/ssl/BERT/BERT_231231_144036/checkpoint/last.pth.tar" \
+    --input_len 12

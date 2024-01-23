@@ -1,6 +1,6 @@
 torchrun \
     --standalone \
-    --nproc_per_node=4 \
+    --nproc_per_node=2 \
     run.py \
     --task_name classification \
     --model Ti_MAE \
@@ -14,7 +14,7 @@ torchrun \
     --train_batch_size 128 \
     --test_batch_size 128 \
     --dropout 0.3 \
-    --linear_dropout 0.6 \
+    --linear_dropout 0.0 \
     --num_workers 12 \
     --use_scheduler \
     --balanced \

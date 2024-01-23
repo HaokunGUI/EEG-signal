@@ -65,7 +65,7 @@ def get_seizure(file_path: str, processed_dir: str, clip_len: int) -> tuple:
     labels = []
 
     for i, (start_time, stop_time) in enumerate(seizure_time):
-        select_row = df[(df['start_time'] == start_time) & (df['stop_time'] == stop_time)]
+        select_row = df[(df['start_time'] >= start_time) & (df['stop_time'] <= stop_time)]
         if not select_row.empty:
             label = select_row['label'].values[0]
 
@@ -118,8 +118,8 @@ def preprocess(raw_dir: str, processed_data: str, output_dir: str, slice_len: in
                     continue
                 try:
                     result, label, padding = get_seizure(os.path.join(dir, file), processed_data, slice_len)
-                except:
-                    print('File not found: ' + file)
+                except Exception as e:
+                    print(f'Error: {e}')
                     continue
                 if not result:
                     continue

@@ -97,7 +97,7 @@ class Exp_Anomaly_Detection(Exp_Basic):
                 else:
                     weight_decay = self.args.weight_decay
                     
-                if any([f in name for f in ['final_projector_ad', 'decoder_ad']]):
+                if any([f in name for f in ['final_projector_ad', 'decoder_ad', 'final_projector']]):
                     param_group = {'params': param, 'lr': self.args.learning_rate, 'weight_decay': weight_decay}
                     params.append(param_group)
                 else:

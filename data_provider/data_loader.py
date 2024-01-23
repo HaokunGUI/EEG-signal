@@ -121,11 +121,11 @@ class Dataset_TUSZ(Dataset):
 
         elif self.task_name == 'classification':
             x, y, padding = self.clips[index], self.labels[index], self.paddings[index]
-            x = torch.Tensor(x)
-            y = torch.Tensor([y])
-
             if self.scalar is not None:
                 x = self.scalar.transform(x)
+            
+            x = torch.Tensor(x)
+            y = torch.Tensor([y])
             # set the paddings to 0
             x[:, padding == 1] = 0
             return x, y, int(False)

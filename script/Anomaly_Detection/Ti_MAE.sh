@@ -1,6 +1,6 @@
 torchrun \
     --standalone \
-    --nproc_per_node=4 \
+    --nproc_per_node=2 \
     run.py \
     --task_name anomaly_detection \
     --model Ti_MAE \
@@ -19,4 +19,5 @@ torchrun \
     --use_scheduler \
     --balanced \
     --weight_decay 1e-4 \
-    --pretrained_path "/home/guihaokun/Time-Series-Pretrain/logging/ssl/Ti_MAE/Ti_MAE_240106_021019/checkpoint/last.pth.tar"
+    --pretrained_path "/home/guihaokun/Time-Series-Pretrain/logging/ssl/Ti_MAE/Ti_MAE_240106_021019/checkpoint/last.pth.tar" \
+    --input_len 12
