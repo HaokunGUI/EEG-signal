@@ -11,6 +11,10 @@ from utils.utils import get_swap_pairs
 
 warnings.filterwarnings('ignore')
 
+dict_map = {
+    'ssl': 'ssl',
+    "anomaly_detection": 'detection',
+}
 
 class Dataset_TUAB(Dataset):
     def __init__(self, args:argparse.Namespace, scalar):
@@ -26,7 +30,7 @@ class Dataset_TUAB(Dataset):
         self.args = args
         self.scalar = scalar
 
-        marker_dir = f'file_markers_{self.task_name}'
+        marker_dir = f'ab_{self.task_name}'
         self.marker_dir = os.path.join(self.marker_dir, marker_dir)
         if self.task_name == 'ssl':
             file_name = f'{self.split}Set_seq2seq_{self.input_len}s.txt'

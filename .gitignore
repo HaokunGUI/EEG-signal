@@ -9,6 +9,8 @@ __pycache__/
 # Distribution / packaging
 .logging/
 /logging/
+.logging_ab/
+/logging_ab/
 .Python
 build/
 develop-eggs/

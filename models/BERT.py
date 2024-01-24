@@ -175,6 +175,9 @@ class BERT(nn.Module):
         self.d_model = d_model
         self.split_num = split_num
 
+        # instance norm
+        self.instance_norm = nn.InstanceNorm1d(patch_size)
+
         # Project the patch_dim to the d_model dimension
         self.embed = nn.Linear(patch_size, d_model)
         self.activation_embed = self._get_activation_fn(activation)
@@ -236,6 +239,12 @@ class BERT(nn.Module):
         B, C, T = x.shape
         assert T % self.patch_size == 0, f"Time series length should be divisible by patch_size, not {T} % {self.patch_size}"
         x = x.view(B, C, -1, self.patch_size) # (B, C, T, patch_size)
+
+        # Instance norm
+        # Instance Norm
+        x = x.view(B*C, *x.shape[2:]) # (B*C, T, patch_size)
+        x = self.instance_norm(x)
+        x = x.view(B, C, *x.shape[1:]) # (B, C, T, patch_size)
 
         # Embedding
         y = self.embed(x) # (B, C, T, d_model)
