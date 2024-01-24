@@ -1,6 +1,9 @@
+export OMP_NUM_THREADS=4 
 torchrun \
     --standalone \
-    --nproc_per_node=4 \
+    --nproc_per_node=2 \
+    --rdzv_endpoint localhost:6000  \
+    --rdzv_backend c10d \
     run.py \
     --task_name anomaly_detection \
     --model BERT \
@@ -14,11 +17,12 @@ torchrun \
     --hidden_channels 16 \
     --activation "gelu" \
     --linear_dropout 0.6 \
-    --train_batch_size 128 \
-    --test_batch_size 128 \
+    --train_batch_size 64 \
+    --test_batch_size 64 \
     --dropout 0.3 \
     --num_workers 8 \
     --use_scheduler \
     --balanced \
     --weight_decay 1e-4 \
-    --pretrained_path "/home/guihaokun/Time-Series-Pretrain/logging/ssl/BERT/BERT_240124_012022/checkpoint/last.pth.tar"
+    --pretrained_path "/home/guihaokun/Time-Series-Pretrain/logging/ssl/BERT/BERT_240124_012022/checkpoint/last.pth.tar"\
+    --input_len 12

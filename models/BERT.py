@@ -240,11 +240,10 @@ class BERT(nn.Module):
         assert T % self.patch_size == 0, f"Time series length should be divisible by patch_size, not {T} % {self.patch_size}"
         x = x.view(B, C, -1, self.patch_size) # (B, C, T, patch_size)
 
-        # Instance norm
-        # Instance Norm
-        x = x.view(B*C, *x.shape[2:]) # (B*C, T, patch_size)
-        x = self.instance_norm(x)
-        x = x.view(B, C, *x.shape[1:]) # (B, C, T, patch_size)
+        # # # Instance Norm
+        # x = x.view(B*C, *x.shape[2:]) # (B*C, T, patch_size)
+        # x = self.instance_norm(x)
+        # x = x.view(B, C, *x.shape[1:]) # (B, C, T, patch_size)
 
         # Embedding
         y = self.embed(x) # (B, C, T, d_model)
