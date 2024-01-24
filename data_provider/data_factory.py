@@ -1,4 +1,5 @@
-from data_provider.data_loader import Dataset_TUSZ
+from data_provider.Dataset_TUSZ import Dataset_TUSZ
+from data_provider.Dataset_TUAB import Dataset_TUAB
 from torch.utils.data import DataLoader
 from torch.utils.data.distributed import DistributedSampler
 from torch.utils.data.sampler import RandomSampler
@@ -7,6 +8,7 @@ import argparse
 
 data_dict = {
     'TUSZ': Dataset_TUSZ,
+    'TUAB': Dataset_TUAB,
 }
 
 def data_provider(args: argparse.Namespace, scalar=None):

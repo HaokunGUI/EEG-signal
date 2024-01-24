@@ -60,6 +60,8 @@ def resample_all(raw_edf_dir, save_dir, freq:int=None):
                 hf.create_dataset("resample_signal", data=signal_array.copy())
                 hf.create_dataset("resample_freq", data=freq)
 
+                del signal_array
+
         except Exception as e:
             print("Error occur:", str(e), 'fail file number:', len(failed_files))
             failed_files.append(edf_fn)
@@ -76,13 +78,13 @@ if __name__ == "__main__":
     parser.add_argument(
         "--raw_edf_dir",
         type=str,
-        default='/data/guihaokun/project/tuh_eeg_seizure/v2.0.0/edf',
+        default='/data/guihaokun/project/tuh_eeg_abnormal/v3.0.0/edf',
         help="Full path to raw edf files.",
     )
     parser.add_argument(
         "--save_dir",
         type=str,
-        default='/data/guihaokun/resample/tuh_eeg_seizure_2',
+        default='/data/guihaokun/resample/tuh_eeg_abnormal',
         help="Full path to dir to save resampled signals.",
     )
     args = parser.parse_args()
