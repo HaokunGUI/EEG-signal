@@ -1,6 +1,6 @@
 torchrun \
     --standalone \
-    --nproc_per_node=4 \
+    --nproc_per_node=3 \
     run.py \
     --task_name anomaly_detection \
     --model TimesNet \
@@ -16,7 +16,7 @@ torchrun \
     --train_batch_size 128 \
     --test_batch_size 128 \
     --use_scheduler \
-    --num_workers 12 \
+    --num_workers 10 \
     --dataset TUAB \
     --root_path "/data/guihaokun/resample/tuh_eeg_abnormal/" \
     --log_dir "/home/guihaokun/Time-Series-Pretrain/logging_ab" \

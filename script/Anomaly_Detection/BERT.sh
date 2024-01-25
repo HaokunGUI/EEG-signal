@@ -1,6 +1,6 @@
 torchrun \
     --standalone \
-    --nproc_per_node=4 \
+    --nproc_per_node=3 \
     run.py \
     --task_name anomaly_detection \
     --model BERT \
@@ -13,7 +13,7 @@ torchrun \
     --d_model 256 \
     --hidden_channels 16 \
     --activation "gelu" \
-    --linear_dropout 0.6 \
+    --linear_dropout 0.7 \
     --train_batch_size 128 \
     --test_batch_size 128 \
     --dropout 0.3 \

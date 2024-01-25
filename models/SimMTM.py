@@ -15,38 +15,56 @@ class SimMTM(nn.Module):
         # hyperparameters
         self.task_name = task_name
         self.e_layers = e_layers
+        self.in_channel = in_channel
+        self.hidden_dim = hidden_dim
 
         self.enc_embedding = DataEmbedding(
-            c_in=in_channel,
+            c_in=freq,
             d_model=hidden_dim,
             max_len=freq * seq_len,
             dropout=dropout,
         )
 
-        self.encoder = nn.ModuleList([nn.Sequential(
-                nn.Conv1d(hidden_dim, hidden_dim, kernel_size=kernel_size, 
-                    bias=False, padding=(kernel_size // 2)),
-                nn.BatchNorm1d(hidden_dim),
-                nn.GELU(),
-                nn.Dropout(dropout)
-            ) for _ in range(e_layers)]
-        )
+        # self.encoder = nn.ModuleList([nn.Sequential(
+        #         nn.Conv1d(hidden_dim, hidden_dim, kernel_size=kernel_size, 
+        #             bias=False, padding=(kernel_size // 2)),
+        #         nn.BatchNorm1d(hidden_dim),
+        #         nn.GELU(),
+        #         nn.Dropout(dropout)
+        #     ) for _ in range(e_layers)]
+        # )
+        self.encoder = nn.ModuleList([nn.TransformerEncoderLayer(
+                d_model=hidden_dim,
+                nhead=8,
+                dim_feedforward=hidden_dim,
+                dropout=dropout,
+                activation='gelu'
+            ) for _ in range(e_layers)])
+        
+        self.pooling = Pooler_Head(seq_len, hidden_dim, dimension, linear_dropout)
+        self.contrastive = ContrastiveWeight(temperature=temperature, 
+                                                 positive_nums=positive_nums)
+        self.aggregation = AggregationRebuild(temperature=temperature,
+                                                 positive_nums=positive_nums)
 
         if self.task_name =='ssl':
-            self.projection = nn.Linear(hidden_dim, in_channel)
+            self.projection = nn.Linear(hidden_dim, freq)
             self.dropout_ssl = nn.Dropout(linear_dropout)
-            self.pooling = Pooler_Head(seq_len*freq, hidden_dim, dimension, linear_dropout)
+            
 
             self.awl = AutomaticWeightedLoss(2)
-            self.contrastive = ContrastiveWeight(temperature=temperature, 
-                                                 positive_nums=positive_nums)
-            self.aggregation = AggregationRebuild(temperature=temperature,
-                                                 positive_nums=positive_nums)
+            
             self.mse = torch.nn.MSELoss()
         elif self.task_name == 'anomaly_detection':
+            self.decoder_ad = nn.Conv1d(in_channel, 1, kernel_size=1)
             self.linear_dropout = nn.Dropout(linear_dropout)
             self.activation = nn.GELU()
-            self.projection_ad = nn.Linear(hidden_dim, 1)
+            self.final_projector = nn.Linear(hidden_dim, 1)
+        elif self.task_name == 'classification':
+            self.decoder_cls = nn.Conv1d(in_channel, 1, kernel_size=1)
+            self.linear_dropout = nn.Dropout(linear_dropout)
+            self.activation = nn.GELU()
+            self.final_projector = nn.Linear(hidden_dim, 4)
         else:
             raise ValueError(f"task_name {self.task_name} is not supported.")
     
@@ -56,11 +74,10 @@ class SimMTM(nn.Module):
         # embedding
         x_enc = self.enc_embedding(x) # [bs x seq_len x d_model]
 
-        x_enc = x_enc.permute(0, 2, 1) # [bs x d_model x seq_len]
         # encoder
         for i in range(self.e_layers):
             x_enc = self.encoder[i](x_enc)
-        p_enc_out = x_enc.permute(0, 2, 1) # [bs x seq_len x d_model]
+        p_enc_out = x_enc # [bs x seq_len x d_model]
         s_enc_out = self.pooling(p_enc_out) # [bs x dimension]
 
         # series weight learning
@@ -78,12 +95,21 @@ class SimMTM(nn.Module):
             loss = self.awl(loss_cl, loss_rb)
 
             return loss, loss_cl, loss_rb, positives_mask, logits, rebuild_weight_matrix, pred_batch_x
-        elif self.task_name == 'anomaly_detection':
-            agg_enc_out = torch.mean(agg_enc_out, dim=1) # [bs x d_model]
+        elif self.task_name == 'anomaly_detection':         
+            agg_enc_out = torch.mean(agg_enc_out[:batch_x.shape[0]], dim=1) # [bs x d_model]
+            agg_enc_out = agg_enc_out.view(-1, self.in_channel, self.hidden_dim) # [bs x n_vars x d_model]
+            agg_enc_out = self.decoder_ad(agg_enc_out).squeeze(1) # [bs x d_model]
             agg_enc_out = self.linear_dropout(agg_enc_out)
             agg_enc_out = self.activation(agg_enc_out)
-            enc_out = self.projection_ad(agg_enc_out)
+            enc_out = self.final_projector(agg_enc_out)
             return enc_out
+        elif self.task_name == 'classification':
+            agg_enc_out = torch.mean(agg_enc_out[:batch_x.shape[0]], dim=1) # [bs x d_model]
+            agg_enc_out = agg_enc_out.view(-1, self.in_channel, self.hidden_dim)
+            agg_enc_out = self.decoder_cls(agg_enc_out).squeeze(1)
+            agg_enc_out = self.linear_dropout(agg_enc_out)
+            agg_enc_out = self.activation(agg_enc_out)
+            enc_out = self.final_projector(agg_enc_out)
         else:
             raise ValueError(f"task_name {self.task_name} is not supported.")
         
@@ -111,7 +137,10 @@ class Model(nn.Module):
     
     def forward(self, x:torch.Tensor):
         # x: [bs x n_vars x seq_len]
-        x = x.permute(0, 2, 1)
+        x = x.view(-1, self.args.input_len, self.args.freq) # [bs*n_vars x seq_len x dim]
+
+        # permute to [bs x dim x seq_len]
+        # x = x.permute(0, 2, 1)
         # data augmentation
         batch_x_mark = torch.ones_like(x)
         batch_x_m, _, _ = masked_data(x.cpu(), batch_x_mark.cpu(), self.args.mask_ratio, self.args.lm, self.args.positive_nums)
@@ -121,6 +150,8 @@ class Model(nn.Module):
         if self.args.task_name == 'ssl':
             return self.model(batch_x_om, x)
         elif self.args.task_name == 'anomaly_detection':
+            return self.model(batch_x_om, x)
+        elif self.args.task_name == 'classification':
             return self.model(batch_x_om, x)
         else:
             raise ValueError(f"task_name {self.task_name} is not supported.")

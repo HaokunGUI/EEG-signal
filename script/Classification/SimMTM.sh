@@ -2,16 +2,16 @@ torchrun \
     --standalone \
     --nproc_per_node=4 \
     run.py \
-    --task_name ssl \
+    --task_name classification \
     --model SimMTM \
-    --learning_rate 2e-3 \
+    --learning_rate 1e-3 \
     --normalize \
     --patience 0 \
-    --num_epochs 100 \
+    --num_epochs 60 \
     --e_layers 2 \
     --d_model 256 \
     --activation "gelu" \
-    --linear_dropout 0.5 \
+    --linear_dropout 0.0 \
     --train_batch_size 64 \
     --test_batch_size 64 \
     --input_len 60 \
@@ -23,4 +23,5 @@ torchrun \
     --dropout 0.3 \
     --num_workers 10 \
     --use_scheduler \
-    --warmup_epochs 20
+    --pretrained_path ""\
+    --balanced
