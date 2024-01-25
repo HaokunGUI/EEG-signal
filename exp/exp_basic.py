@@ -21,7 +21,7 @@ class Exp_Basic(object):
         self.model = self._build_model()
         self.scalar = self._get_scalar()
         self.world_size = int(os.environ["WORLD_SIZE"])
-        suffix = datetime.datetime.now().strftime("%y%m%d_%H%M%S")
+        suffix = datetime.datetime.now().strftime("%y%m%d_%H%M")
         self.logging_dir = os.path.join(self.args.log_dir, self.args.task_name, self.args.model, f'{self.args.model}_{suffix}')
         log_dir = os.path.join(self.logging_dir, 'log')
         os.makedirs(log_dir, exist_ok=True)

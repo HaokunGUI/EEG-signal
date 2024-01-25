@@ -1,6 +1,6 @@
 torchrun \
     --standalone \
-    --nproc_per_node=2 \
+    --nproc_per_node=4 \
     run.py \
     --task_name anomaly_detection \
     --model Ti_MAE \
@@ -15,9 +15,10 @@ torchrun \
     --test_batch_size 128 \
     --dropout 0.3 \
     --linear_dropout 0.6 \
-    --num_workers 12 \
+    --num_workers 10 \
     --use_scheduler \
-    --balanced \
     --weight_decay 1e-4 \
-    --pretrained_path "/home/guihaokun/Time-Series-Pretrain/logging/ssl/Ti_MAE/Ti_MAE_240106_021019/checkpoint/last.pth.tar" \
-    --input_len 12
+    --pretrained_path "/home/guihaokun/Time-Series-Pretrain/logging_ab/ssl/Ti_MAE/Ti_MAE_240125_0250/checkpoint/last.pth.tar" \
+    --dataset TUAB \
+    --root_path "/data/guihaokun/resample/tuh_eeg_abnormal/" \
+    --log_dir "/home/guihaokun/Time-Series-Pretrain/logging_ab" 

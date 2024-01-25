@@ -4,19 +4,22 @@ torchrun \
     run.py \
     --task_name ssl \
     --model Ti_MAE \
-    --learning_rate 1e-4 \
+    --learning_rate 2e-4 \
     --normalize \
     --patience 0 \
-    --num_epochs 150 \
+    --num_epochs 100 \
     --e_layers 2 \
     --d_layers 1 \
     --d_model 256 \
     --activation "gelu" \
-    --train_batch_size 64 \
-    --test_batch_size 64 \
+    --train_batch_size 128 \
+    --test_batch_size 128 \
     --dropout 0.3 \
-    --linear_dropout 0.3 \
+    --linear_dropout 0.2 \
     --mask_ratio 0.3 \
     --num_workers 10 \
     --use_scheduler \
+    --dataset TUAB \
+    --root_path "/data/guihaokun/resample/tuh_eeg_abnormal/" \
+    --log_dir "/home/guihaokun/Time-Series-Pretrain/logging_ab" \
     --warmup_epochs 20

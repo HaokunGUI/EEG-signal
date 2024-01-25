@@ -12,10 +12,12 @@ torchrun \
     --e_layers 3 \
     --dropout 0.4 \
     --top_k 3 \
-    --num_epochs 150 \
-    --train_batch_size 64 \
-    --test_batch_size 64 \
+    --num_epochs 60 \
+    --train_batch_size 128 \
+    --test_batch_size 128 \
     --use_scheduler \
-    --num_workers 8 \
-    --balanced \
+    --num_workers 12 \
+    --dataset TUAB \
+    --root_path "/data/guihaokun/resample/tuh_eeg_abnormal/" \
+    --log_dir "/home/guihaokun/Time-Series-Pretrain/logging_ab" \
     --normalize
