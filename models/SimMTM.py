@@ -40,31 +40,30 @@ class SimMTM(nn.Module):
                 dropout=dropout,
                 activation='gelu'
             ) for _ in range(e_layers)])
-        
-        self.pooling = Pooler_Head(seq_len, hidden_dim, dimension, linear_dropout)
-        self.contrastive = ContrastiveWeight(temperature=temperature, 
-                                                 positive_nums=positive_nums)
-        self.aggregation = AggregationRebuild(temperature=temperature,
-                                                 positive_nums=positive_nums)
 
         if self.task_name =='ssl':
+            self.pooling = Pooler_Head(seq_len, hidden_dim, dimension, linear_dropout)
+            self.contrastive = ContrastiveWeight(temperature=temperature, 
+                                                    positive_nums=positive_nums)
+            self.aggregation = AggregationRebuild(temperature=temperature,
+                                                 positive_nums=positive_nums)
             self.projection = nn.Linear(hidden_dim, freq)
             self.dropout_ssl = nn.Dropout(linear_dropout)
-            
-
             self.awl = AutomaticWeightedLoss(2)
-            
             self.mse = torch.nn.MSELoss()
+
         elif self.task_name == 'anomaly_detection':
             self.decoder_ad = nn.Conv1d(in_channel, 1, kernel_size=1)
             self.linear_dropout = nn.Dropout(linear_dropout)
             self.activation = nn.GELU()
             self.final_projector = nn.Linear(hidden_dim, 1)
+
         elif self.task_name == 'classification':
             self.decoder_cls = nn.Conv1d(in_channel, 1, kernel_size=1)
             self.linear_dropout = nn.Dropout(linear_dropout)
             self.activation = nn.GELU()
             self.final_projector = nn.Linear(hidden_dim, 4)
+
         else:
             raise ValueError(f"task_name {self.task_name} is not supported.")
     
@@ -77,15 +76,15 @@ class SimMTM(nn.Module):
         # encoder
         for i in range(self.e_layers):
             x_enc = self.encoder[i](x_enc)
-        p_enc_out = x_enc # [bs x seq_len x d_model]
-        s_enc_out = self.pooling(p_enc_out) # [bs x dimension]
-
-        # series weight learning
-        loss_cl, similarity_matrix, logits, positives_mask = self.contrastive(s_enc_out)
-        rebuild_weight_matrix, agg_enc_out = self.aggregation(similarity_matrix, p_enc_out) 
-        agg_enc_out = agg_enc_out.view(bs, seq_len, -1) # [bs x seq_len x d_model]
-
+        
         if self.task_name == 'ssl':
+            p_enc_out = x_enc # [bs x seq_len x d_model]
+            s_enc_out = self.pooling(p_enc_out) # [bs x dimension]
+
+            # series weight learning
+            loss_cl, similarity_matrix, logits, positives_mask = self.contrastive(s_enc_out)
+            rebuild_weight_matrix, agg_enc_out = self.aggregation(similarity_matrix, p_enc_out) 
+            agg_enc_out = agg_enc_out.view(bs, seq_len, -1) # [bs x seq_len x d_model]
             # decoder
             agg_enc_out = self.dropout_ssl(agg_enc_out)
             dec_out = self.projection(agg_enc_out) # [bs x seq_len x n_vars]
@@ -95,8 +94,9 @@ class SimMTM(nn.Module):
             loss = self.awl(loss_cl, loss_rb)
 
             return loss, loss_cl, loss_rb, positives_mask, logits, rebuild_weight_matrix, pred_batch_x
-        elif self.task_name == 'anomaly_detection':         
-            agg_enc_out = torch.mean(agg_enc_out[:batch_x.shape[0]], dim=1) # [bs x d_model]
+        elif self.task_name == 'anomaly_detection':   
+            agg_enc_out = x_enc[:batch_x.shape[0]] # [bs x seq_len x d_model]
+            agg_enc_out = torch.mean(agg_enc_out, dim=1) # [bs x d_model]
             agg_enc_out = agg_enc_out.view(-1, self.in_channel, self.hidden_dim) # [bs x n_vars x d_model]
             agg_enc_out = self.decoder_ad(agg_enc_out).squeeze(1) # [bs x d_model]
             agg_enc_out = self.linear_dropout(agg_enc_out)
@@ -104,7 +104,8 @@ class SimMTM(nn.Module):
             enc_out = self.final_projector(agg_enc_out)
             return enc_out
         elif self.task_name == 'classification':
-            agg_enc_out = torch.mean(agg_enc_out[:batch_x.shape[0]], dim=1) # [bs x d_model]
+            agg_enc_out = x_enc[:batch_x.shape[0]] # [bs x seq_len x d_model]
+            agg_enc_out = torch.mean(agg_enc_out, dim=1) # [bs x d_model]
             agg_enc_out = agg_enc_out.view(-1, self.in_channel, self.hidden_dim)
             agg_enc_out = self.decoder_cls(agg_enc_out).squeeze(1)
             agg_enc_out = self.linear_dropout(agg_enc_out)
