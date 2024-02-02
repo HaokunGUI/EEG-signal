@@ -153,7 +153,7 @@ class Exp_Anomaly_Detection(Exp_Basic):
                 if self.args.model in ['DCRNN']:
                     seq_len = torch.ones(x.shape[0], dtype=torch.int64).cuda() * self.args.input_len
                     y_pred = self.model(x, seq_len, supports)
-                elif self.args.model in ['TimesNet', 'VQ_BERT', 'BERT', 'Ti_MAE']:
+                elif self.args.model in ['TimesNet', 'VQ_BERT', 'BERT', 'Ti_MAE', 'SimMTM']:
                     y_pred = self.model(x)
                 else:
                     pass
@@ -332,7 +332,7 @@ class Exp_Anomaly_Detection(Exp_Basic):
                 if self.args.model in ['DCRNN']:
                     seq_len = torch.ones(x.shape[0], dtype=torch.int64).cuda() * self.args.input_len
                     y_pred = self.model(x, seq_len, supports)
-                elif self.args.model in ['TimesNet', 'VQ_BERT', 'BERT', 'Ti_MAE']:
+                elif self.args.model in ['TimesNet', 'VQ_BERT', 'BERT', 'Ti_MAE', 'SimMTM']:
                     y_pred = self.model(x)
                 else:
                     pass

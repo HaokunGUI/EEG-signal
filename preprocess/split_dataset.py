@@ -12,31 +12,45 @@ def get_split_patient(dir_path: str):
             for i in range(len(f_str)):
                 file_name = f_str[i].strip('\n').split('.edf')[0]
                 file_name_dict[label].add(file_name)
+        with open(os.path.join(dir_path, f'evalSet_seq2seq_60s_{label}.txt'), 'r') as f:
+            f_str = f.readlines()
+            for i in range(len(f_str)):
+                file_name = f_str[i].strip('\n').split('.edf')[0]
+                file_name_dict[label].add(file_name)
     szf = list(file_name_dict['sz'])
     noszf = list(file_name_dict['nosz'])
 
     f = szf + noszf
     np.random.shuffle(f)
     length = len(f)
-    train_set = f[:int(length * 0.9)]
-    dev_set = f[int(length * 0.9):]
-    return  train_set, dev_set
+    train_set = f[:int(length * 0.8)]
+    dev_set = f[int(length * 0.8): (int(length * 0.9))]
+    eval_set = f[int(length * 0.9):]
+    return  train_set, dev_set, eval_set
 
-def split_ssl_dataset(ssl_dir: str, output_dir: str, dev_set):
+def split_ssl_dataset(ssl_dir: str, output_dir: str, dev_set, eval_set):
     output_dir = os.path.join(output_dir, 'ab_ssl')
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
         
     train_dataset = []
     dev_dataset = []
+    eval_dataset = []
     with open(os.path.join(ssl_dir, 'trainSet_seq2seq_60s.txt'), 'r') as f:
-        f_str = f.readlines()
-        for i in range(len(f_str)):
-            file_name = f_str[i].strip('\n').split('.edf')[0]
-            if file_name in dev_set:
-                dev_dataset.append(f_str[i])
-            else:
-                train_dataset.append(f_str[i])
+        f_str_1 = f.readlines()
+    with open(os.path.join(ssl_dir, 'evalSet_seq2seq_60s.txt'), 'r') as f:
+        f_str_2 = f.readlines()
+
+    f_str = f_str_1 + f_str_2
+
+    for i in range(len(f_str)):
+        file_name = f_str[i].strip('\n').split('.edf')[0]
+        if file_name in dev_set:
+            dev_dataset.append(f_str[i])
+        elif file_name in eval_set:
+            eval_dataset.append(f_str[i])
+        else:
+            train_dataset.append(f_str[i])
     
     with open(os.path.join(output_dir, 'trainSet_seq2seq_60s.txt'), 'w') as f:
         for i in range(len(train_dataset)):
@@ -44,8 +58,11 @@ def split_ssl_dataset(ssl_dir: str, output_dir: str, dev_set):
     with open(os.path.join(output_dir, 'devSet_seq2seq_60s.txt'), 'w') as f:
         for i in range(len(dev_dataset)):
             f.write(dev_dataset[i])
+    with open(os.path.join(output_dir, 'evalSet_seq2seq_60s.txt'), 'w') as f:
+        for i in range(len(eval_dataset)):
+            f.write(eval_dataset[i])
 
-def split_detection_dataset(detection_dir: str, output_dir: str, dev_set):
+def split_detection_dataset(detection_dir: str, output_dir: str, dev_set, eval_set):
     output_dir = os.path.join(output_dir, 'ab_detection')
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
@@ -54,24 +71,38 @@ def split_detection_dataset(detection_dir: str, output_dir: str, dev_set):
     train_dataset_nosz = []
     dev_dataset_sz = []
     dev_dataset_nosz = []
+    eval_dataset_sz = []
+    eval_dataset_nosz = []
 
     with open(os.path.join(detection_dir, 'trainSet_seq2seq_60s_sz.txt'), 'r') as f:
-        f_str = f.readlines()
-        for i in range(len(f_str)):
-            file_name = f_str[i].strip('\n').split('.edf')[0]
-            if file_name in dev_set:
-                dev_dataset_sz.append(f_str[i])
-            else:
-                train_dataset_sz.append(f_str[i])
+        f_str_1 = f.readlines()
+    with open(os.path.join(detection_dir, 'evalSet_seq2seq_60s_nosz.txt'), 'r') as f:
+        f_str_2 = f.readlines()
+
+    f_str = f_str_1 + f_str_2
+
+    for i in range(len(f_str)):
+        file_name = f_str[i].strip('\n').split('.edf')[0]
+        if file_name in dev_set:
+            dev_dataset_sz.append(f_str[i])
+        elif file_name in eval_set:
+            eval_dataset_sz.append(f_str[i])
+        else:
+            train_dataset_sz.append(f_str[i])
 
     with open(os.path.join(detection_dir, 'trainSet_seq2seq_60s_nosz.txt'), 'r') as f:
-        f_str = f.readlines()
-        for i in range(len(f_str)):
-            file_name = f_str[i].strip('\n').split('.edf')[0]
-            if file_name in dev_set:
-                dev_dataset_nosz.append(f_str[i])
-            else:
-                train_dataset_nosz.append(f_str[i])
+        f_str_1 = f.readlines()
+    with open(os.path.join(detection_dir, 'evalSet_seq2seq_60s_nosz.txt'), 'r') as f:
+        f_str_2 = f.readlines()
+    f_str = f_str_1 + f_str_2
+    for i in range(len(f_str)):
+        file_name = f_str[i].strip('\n').split('.edf')[0]
+        if file_name in dev_set:
+            dev_dataset_nosz.append(f_str[i])
+        elif file_name in eval_set:
+            eval_dataset_nosz.append(f_str[i])
+        else:
+            train_dataset_nosz.append(f_str[i])
     
     with open(os.path.join(output_dir, 'trainSet_seq2seq_60s_sz.txt'), 'w') as f:
         for i in range(len(train_dataset_sz)):
@@ -85,11 +116,17 @@ def split_detection_dataset(detection_dir: str, output_dir: str, dev_set):
     with open(os.path.join(output_dir, 'devSet_seq2seq_60s_nosz.txt'), 'w') as f:
         for i in range(len(dev_dataset_nosz)):
             f.write(dev_dataset_nosz[i])
+    with open(os.path.join(output_dir, 'evalSet_seq2seq_60s_sz.txt'), 'w') as f:
+        for i in range(len(eval_dataset_sz)):
+            f.write(eval_dataset_sz[i])
+    with open(os.path.join(output_dir, 'evalSet_seq2seq_60s_nosz.txt'), 'w') as f:
+        for i in range(len(eval_dataset_nosz)):
+            f.write(eval_dataset_nosz[i])
 
 def process(detection_dir: str, ssl_dir: str, output_dir: str):
-    train_set, dev_set = get_split_patient(detection_dir)
-    split_detection_dataset(detection_dir, output_dir, dev_set)
-    split_ssl_dataset(ssl_dir, output_dir, dev_set)
+    train_set, dev_set, eval_set = get_split_patient(detection_dir)
+    split_detection_dataset(detection_dir, output_dir, dev_set, eval_set)
+    split_ssl_dataset(ssl_dir, output_dir, dev_set, eval_set)
 
 if __name__ == '__main__':
     detection_dir = '/home/guihaokun/Time-Series-Pretrain/data/ab_detection_origin'

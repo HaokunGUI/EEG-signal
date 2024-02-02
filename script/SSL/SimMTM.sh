@@ -4,23 +4,24 @@ torchrun \
     run.py \
     --task_name ssl \
     --model SimMTM \
-    --learning_rate 2e-3 \
+    --learning_rate 1e-3 \
     --normalize \
     --patience 0 \
-    --num_epochs 100 \
+    --num_epochs 10 \
     --e_layers 2 \
     --d_model 256 \
     --activation "gelu" \
     --linear_dropout 0.5 \
-    --train_batch_size 64 \
-    --test_batch_size 64 \
+    --train_batch_size 32 \
+    --test_batch_size 32 \
     --input_len 60 \
-    --output_len 60 \
     --mask_ratio 0.15 \
     --positive_num 2 \
     --temperature 0.1 \
     --attn_head 8 \
     --dropout 0.3 \
-    --num_workers 10 \
+    --num_workers 6 \
     --use_scheduler \
-    --warmup_epochs 20
+    --dataset TUAB \
+    --root_path "/data/guihaokun/resample/tuh_eeg_abnormal/" \
+    --log_dir "/home/guihaokun/Time-Series-Pretrain/logging_ab" 

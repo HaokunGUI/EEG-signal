@@ -7,7 +7,7 @@ torchrun \
     --learning_rate 2e-3 \
     --normalize \
     --patience 0 \
-    --num_epochs 100 \
+    --num_epochs 150 \
     --e_layers 2 \
     --d_model 256 \
     --mask_ratio 0.3 \

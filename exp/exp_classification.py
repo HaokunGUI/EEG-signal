@@ -37,7 +37,7 @@ class Exp_Classification(Exp_Basic):
         if self.args.use_gpu:
             if self.args.model in ['VQ_BERT']:
                 model = DDP(model, device_ids=[self.device], find_unused_parameters=True)
-            elif self.args.model in ['DCRNN', 'TimesNet', 'BERT', 'Ti_MAE']:
+            elif self.args.model in ['DCRNN', 'TimesNet', 'BERT', 'Ti_MAE', 'SimMTM']:
                 model = nn.DataParallel(model, device_ids=[self.device])
         if self.args.use_pretrained:
             load_model_checkpoint(self.args.pretrained_path, model, map_location=self.device)
@@ -67,7 +67,7 @@ class Exp_Classification(Exp_Basic):
         return data_set, data_loader
 
     def _select_optimizer(self):
-        if self.args.model in ['VQ_BERT', 'BERT', 'Ti_MAE']:
+        if self.args.model in ['VQ_BERT', 'BERT', 'Ti_MAE', 'SimMTM']:
             params = []
             for name, param in self.model.named_parameters():
                 # only update the parameters that are not frozen
@@ -82,9 +82,9 @@ class Exp_Classification(Exp_Basic):
                 if any([f in name for f in ['final_projector_cls', 'decoder_cls', 'final_projector']]):
                     param_group = {'params': param, 'lr': self.args.learning_rate, 'weight_decay': weight_decay}
                     params.append(param_group)
-                else:
-                    param_group = {'params': param, 'lr': self.args.learning_rate, 'weight_decay': weight_decay}
-                    params.append(param_group)
+                # else:
+                #     param_group = {'params': param, 'lr': self.args.learning_rate, 'weight_decay': weight_decay}
+                #     params.append(param_group)
                 
             model_optim = optim.AdamW(params)
         else:
@@ -92,7 +92,7 @@ class Exp_Classification(Exp_Basic):
         return model_optim
 
     def _select_criterion(self):
-        if self.args.model in ['DCRNN', 'VQ_BERT', 'BERT', 'Ti_MAE']:
+        if self.args.model in ['DCRNN', 'VQ_BERT', 'BERT', 'Ti_MAE', 'SimMTM']:
             criterion = nn.CrossEntropyLoss().cuda()
         elif self.args.model in ['TimesNet']:
             # criterion = sigmoid_focal_loss
@@ -137,7 +137,7 @@ class Exp_Classification(Exp_Basic):
                     y_pred = self.model(x, seq_len, supports)
                 elif self.args.model in ['TimesNet']:
                     y_pred = self.model(x)
-                elif self.args.model in ['VQ_BERT', 'BERT', 'Ti_MAE']:
+                elif self.args.model in ['VQ_BERT', 'BERT', 'Ti_MAE', 'SimMTM']:
                     y_pred = self.model(x)
                 else:
                     pass
@@ -240,7 +240,7 @@ class Exp_Classification(Exp_Basic):
                         y_pred = self.model(x)
                         # loss = self.criterion(y_pred, y, reduction='mean')
                         loss = self.criterion(y_pred, y.squeeze(-1).long())
-                    elif self.args.model in ['VQ_BERT', 'BERT', 'Ti_MAE']:
+                    elif self.args.model in ['VQ_BERT', 'BERT', 'Ti_MAE', 'SimMTM']:
                         y_pred = self.model(x)
                         loss = self.criterion(y_pred, y.squeeze(-1).long())
                     else:
@@ -312,7 +312,7 @@ class Exp_Classification(Exp_Basic):
                     y_pred = self.model(x, seq_len, supports)
                 elif self.args.model in ['TimesNet']:
                     y_pred = self.model(x)
-                elif self.args.model in ['VQ_BERT', 'BERT', 'Ti_MAE']:
+                elif self.args.model in ['VQ_BERT', 'BERT', 'Ti_MAE', 'SimMTM']:
                     y_pred = self.model(x)
                 else:
                     pass

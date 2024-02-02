@@ -8,7 +8,7 @@ class DataEmbedding(nn.Module):
         super(DataEmbedding, self).__init__()
 
         self.value_embedding = TokenEmbedding(c_in=c_in, d_model=d_model)
-        self.position_embedding = PositionalEmbedding(d_model=d_model, max_len=max_len)
+        self.position_embedding = PositionalEmbedding(d_model=d_model, max_len=15000)
         self.dropout = nn.Dropout(p=dropout)
 
     def forward(self, x):

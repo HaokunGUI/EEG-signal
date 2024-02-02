@@ -67,7 +67,7 @@ def markSeizureSlice(
 if __name__ == '__main__':
     preprocess(
         input_dir='/data/guihaokun/resample/tuh_eeg_abnormal',
-        output_dir='/home/guihaokun/Time-Series-Pretrain/data/ab_detection',
+        output_dir='/home/guihaokun/Time-Series-Pretrain/data/ab_detection_origin',
         raw_data_dir='/data/guihaokun/project/tuh_eeg_abnormal/v3.0.0/edf/',
-        clip_size=60,
+        clip_size=12,
     )

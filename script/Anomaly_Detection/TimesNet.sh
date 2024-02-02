@@ -1,6 +1,6 @@
 torchrun \
     --standalone \
-    --nproc_per_node=3 \
+    --nproc_per_node=4 \
     run.py \
     --task_name anomaly_detection \
     --model TimesNet \
@@ -10,9 +10,9 @@ torchrun \
     --num_kernels 6 \
     --d_model 16 \
     --e_layers 3 \
-    --dropout 0.4 \
+    --dropout 0.3 \
     --top_k 3 \
-    --num_epochs 60 \
+    --num_epochs 20 \
     --train_batch_size 128 \
     --test_batch_size 128 \
     --use_scheduler \

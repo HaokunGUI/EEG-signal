@@ -111,6 +111,7 @@ class SimMTM(nn.Module):
             agg_enc_out = self.linear_dropout(agg_enc_out)
             agg_enc_out = self.activation(agg_enc_out)
             enc_out = self.final_projector(agg_enc_out)
+            return enc_out 
         else:
             raise ValueError(f"task_name {self.task_name} is not supported.")
         
@@ -143,16 +144,16 @@ class Model(nn.Module):
         # permute to [bs x dim x seq_len]
         # x = x.permute(0, 2, 1)
         # data augmentation
-        batch_x_mark = torch.ones_like(x)
-        batch_x_m, _, _ = masked_data(x.cpu(), batch_x_mark.cpu(), self.args.mask_ratio, self.args.lm, self.args.positive_nums)
-        batch_x_m = batch_x_m.cuda()
-        batch_x_om = torch.cat([x, batch_x_m], dim=0)
 
         if self.args.task_name == 'ssl':
+            batch_x_mark = torch.ones_like(x)
+            batch_x_m, _, _ = masked_data(x.cpu(), batch_x_mark.cpu(), self.args.mask_ratio, self.args.lm, self.args.positive_nums)
+            batch_x_m = batch_x_m.cuda()
+            batch_x_om = torch.cat([x, batch_x_m], dim=0)
             return self.model(batch_x_om, x)
         elif self.args.task_name == 'anomaly_detection':
-            return self.model(batch_x_om, x)
+            return self.model(x, x)
         elif self.args.task_name == 'classification':
-            return self.model(batch_x_om, x)
+            return self.model(x, x)
         else:
             raise ValueError(f"task_name {self.task_name} is not supported.")

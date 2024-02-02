@@ -23,5 +23,5 @@ torchrun \
     --dropout 0.3 \
     --num_workers 10 \
     --use_scheduler \
-    --pretrained_path ""\
+    --pretrained_path "/home/guihaokun/Time-Series-Pretrain/logging/ssl/SimMTM/SimMTM_240126_0019/checkpoint/last.pth.tar"\
     --balanced

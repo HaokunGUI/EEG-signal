@@ -83,9 +83,9 @@ class Exp_SSL(Exp_Basic):
         return criterion
     
     def _select_scheduler(self, optimizer):
-        if self.args.model in ['DCRNN']:
+        if self.args.model in ['DCRNN', 'SimMTM',]:
             scheduler = CosineAnnealingLR(optimizer, T_max=self.args.num_epochs)
-        elif self.args.model in ['VQ_BERT', 'BERT', 'SimMTM', 'Ti_MAE']:
+        elif self.args.model in ['VQ_BERT', 'BERT', 'Ti_MAE']:
             scheduler1 = LinearLR(optimizer, start_factor=0.5, total_iters=self.args.warmup_epochs)
             scheduler2 = CosineAnnealingLR(optimizer, T_max=self.args.num_epochs - self.args.warmup_epochs)
             scheduler = SequentialLR(optimizer, [scheduler1, scheduler2], milestones=[self.args.warmup_epochs])

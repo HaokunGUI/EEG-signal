@@ -21,7 +21,13 @@ torchrun \
     --temperature 0.1 \
     --attn_head 8 \
     --dropout 0.3 \
-    --num_workers 10 \
+    --num_workers 8 \
     --use_scheduler \
-    --pretrained_path ""\
-    --balanced
+    --weight_decay 1e-3 \
+    --pretrained_path "/home/guihaokun/Time-Series-Pretrain/logging/ssl/SimMTM/SimMTM_240126_0019/checkpoint/last.pth.tar" \
+    --balance \
+    --input_len 12 \
+    --dataset TUAB \
+    --root_path "/data/guihaokun/resample/tuh_eeg_abnormal/" \
+    --log_dir "/home/guihaokun/Time-Series-Pretrain/logging_ab" 
+    
